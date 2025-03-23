@@ -1,4 +1,4 @@
-# C notes
+___# C notes
 
 ## Theory
 
@@ -479,6 +479,12 @@ a %= 5; // Bitwise OR
 
 - Ternary operator: `?`, `:`
   - Shorthand way for writing an `if-else` statement
+  ```c
+  int a = 10;
+  int b = 14;
+  // Statement is false, so c = b
+  int c = ( a > b) ? a : b;
+  ```
 - Assignment operator: `=`
 - Separator: `,`
 
@@ -490,8 +496,99 @@ a %= 5; // Bitwise OR
 - Nonzero values are *TRUE*
 - `-1` is *TRUE* in C
 
+### Decisions
+
+#### `switch-case` structure
+
+- It is a control flow structure that allows you to execute one of many code blocks based on the value of an expression `a`
+```c
+int a;
+
+printf("Select item 1, 2, or 3: ");
+scanf("%d",&a);
+
+switch(a)
+{
+  case 1:
+    puts("This is the first item");
+    break;
+  case 2:
+    puts("This is the second item");
+    break;
+  case 3:
+    puts("You chose the third item");
+    break;
+  default:
+    puts("Invalid choice");
+}
+```
+
+- Part of the coding challenge program:
+  ```c
+  switch (input)
+  {
+    // OR statement for both cases could be done as follows:
+    case 'R':
+    case 'r':
+        printf("move right\n");
+        break;
+    case 'L':
+    case 'l':
+        printf("move left\n");
+        break;
+    default:
+        printf("Invalid command\n");
+        break;    
+  }
+  ```
+
+
+### Loops
+
+#### `do while` loop
+
+- Executes at least once
+
+#### `break`
+
+- It is used to break the loop in some condition
+
+#### `goto` 
+
+- It should be avoided, because of it's unexpected behaviour
+
+#### Nested loops
+
+- `for loops` could be more useful after all, as we can make nested loops with them - it is possible to make them with `while` loops, but they will have more lines of code
 
 ### Functions
+
+#### `getchar()`
+
+- Reads input and return integers values
+- Program which has implementation of checking occurence of `\n`, which is problematic in that case:
+  ```c
+  int input;
+    int done = FALSE;
+    while (!done)
+    {
+        printf("Enter a command: ");
+        input = getchar();
+        switch (input)
+        {
+        case 'R':
+        case 'r':
+            printf("move right\n");
+            break;
+        default:
+            printf("Invalid command\n");
+            break;
+        }
+        while (( input = getchar() )!= '\n')
+        // If the current char is \n, we are not proceeding with this loop
+          ;
+    }
+  ```
 
 #### `putchar()`
 
