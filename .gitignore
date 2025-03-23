@@ -1,3 +1,6 @@
 # Ignore test files and executables
-**.output/
+**output/
 test.c
+
+# Ignore .vscode folder
+**.vscode/

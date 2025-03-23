@@ -123,6 +123,7 @@ srand((unsigned)time(NULL));
   - `\xn` - hexadecimal **n** value (base 16)
   - `\?` - ? character
   - `\0` - null character
+- For single characters single quotes: `''` are used
 
 ##### String Literals
 
@@ -132,7 +133,7 @@ char greetings[4] = { 'H', 'i', '\x21', '\0'};
 ```
 
 - Character arrays are used as strings
-- Contained within double quotes
+- Contained within double quotes: `""`
 - Everything between the double quotes is part of the string
 - Strings are terminated with the null character, `\0`
 - The null character is added automatically to a string literal
@@ -258,7 +259,7 @@ typedef long unsigned time_t
   unsigned y = 17U;
   ```
 
-### Convesrion Specifications (Placeholders)
+### Conversion Specifications (Placeholders)
 
 ```c
 %[options]n
@@ -295,3 +296,221 @@ const int count = 10;
 ```
 
 - Used to use constant in multiple function in a source code file
+
+### Math
+
+#### Basic operations
+
+##### Postfixed
+Postfixed math operations take place after the variable is used, e.g.:
+  ```c
+  int a;
+  a = 10;
+  printf("a is %d\n", a++);
+  // a is 10
+  printf("a is %d\n", a);
+  // a is 11
+  ```
+
+- Increment
+  ```c
+  a++;
+  ```
+- Decrement
+  ```c
+  b--;
+  ```
+
+##### Prefixed
+Prefixed math operations take place before the variable is used, e.g.:
+  ```c
+  int a;
+  a = 10;
+  printf("a is %d\n", ++a);
+  // a is 11
+  printf("a is %d\n", a);
+  // a is 11
+  ```
+- Increment
+  ```c
+  a++;
+  ```
+- Decrement
+  ```c
+  b--;
+  ```
+
+##### division
+
+- Always specify a float value for division and use the decimal portion (`.0`) when assigng a value
+
+##### `%` modulo operator
+
+- Obtains the modulo of two values
+
+##### Assignment operators
+
+- Basic
+```c
+a += 5; // Bit shift left
+a -= 5; // Bit shift right
+a *= 5; // Bitwise AND
+a /= 5; // Bitwise exclusive OR
+a %= 5; // Bitwise OR
+```
+
+- `<<=`
+  - Bit shift left
+
+- `>>=`
+  - Bit shift right
+
+- `&=`
+  - Bitwise AND
+
+- `^=`
+  - Bitwise exclusive OR
+
+- `|=`
+  - Bitwise OR
+
+#### Order of Precedence
+
+1. Left to right
+2. Parentheses first
+3. Multiplication, division
+4. Addition, subtraction
+
+##### Expressions
+
+- Parentheses (grouping): `()`
+- Brackets (elements): `[]`
+- Pointer structure member: `->`
+- Structure member: `.`
+
+##### Unary Operators
+- Affect only one variable
+
+- Not: `!`
+  - Expression must be enclosed in parentheses, because it is a unary operator
+  ```c
+  if ( !(a < 10))
+  ```
+- One's complement: `~`
+  - It changes 1 to 0 and 0 to 1.
+- Negative: `-`
+  - Sets negative value
+- Positive: `+`
+  - Sets positive value
+- Pointer dereference: `*`
+- Address-of: `&`
+- Increment: `++`
+- Decrement: `--`
+- Data size: `sizeof`
+  - Used on variables, arrays, allocated memory
+  - Returns a `size_t` value (unsigned positive integer, representing the number of bytes of memory the item occupies)
+  - `stdio.h` header file must be included in the code
+  - Used when allocating memory or dealing with pointers
+
+##### Binary Operators
+
+- Bitwise logical AND: `&`
+- Bitwise exclusive OR (XOR): `^`
+- Bitwise logical OR: `|`
+- Logical AND: `&&`
+- Logical OR: `||`
+
+##### Bitwise Operators
+
+- These operators shift the bits in a byte
+- `X` is an integer variable to shift right or left by `N` bits
+  - `a = x >> n`
+  - `a = x << n`
+- Zero bits are shifte into the value from left to right
+- Bits shifted off the edge are gone
+- In C++ these operators are used to *put-to* or *get-from* operator
+- At the binary level, shifting bits left one notch doubles the integer value. (1, 2, 4, 8, ...)
+
+- Left shift: `<<`
+  - Example of bitwise math (doubling value twice):
+  ```c
+  int a = 10;
+
+  a <<= 2;
+
+  // Output:
+  // 40
+  
+- Right shift: `>>`
+  - Example of bitwise math (division by half) and it is much faster than using the division operator on an integer:
+  ```c
+      int a = 1000000;
+
+    while (a > 0)
+    {
+        printf("%d\n", a);
+        a >>= 1; // a shifted to the right one position (one notch to the right)
+    }
+    // Output:
+    // 1000000
+    // 500000
+    // 250000
+    // 125000
+    // 62500
+    // 31250
+    // 15625
+    // 7812
+    // 3906
+    // 1953
+    // 976
+    // 488
+    // 244
+    // 122
+    // 61
+    // 30
+    // 15
+    // 7
+    // 3
+    // 1
+    ```
+    The division isn't perfect because binary values lack decimal parts
+
+##### Remaining Operators
+
+- Ternary operator: `?`, `:`
+  - Shorthand way for writing an `if-else` statement
+- Assignment operator: `=`
+- Separator: `,`
+
+#### Logical operators
+
+##### Logical Operator Considerations
+
+- The value `0` is *FALSE*
+- Nonzero values are *TRUE*
+- `-1` is *TRUE* in C
+
+
+### Functions
+
+#### `putchar()`
+
+- Is a part of the standard C library and is used to write a single character to the standard output
+- E.g. use with `if` statement:
+  ```c
+  int a = 1;
+
+  while(a <= 5)
+  {
+    if( a == 3)
+      putchar('*'); // Single quotes are for character
+    printf("%d\n", a); // Double quotes " are for string
+    a++;
+  }
+  // Output:
+  // 1
+  // 2
+  // *3
+  // 4
+  // 5
+  ```
