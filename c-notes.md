@@ -498,6 +498,10 @@ a %= 5; // Bitwise OR
 
 ### Decisions
 
+#### `if` keyword
+
+The expression must be true or a `non-zero value`; `zero` is considered false in C.
+
 #### `switch-case` structure
 
 - It is a control flow structure that allows you to execute one of many code blocks based on the value of an expression `a`
@@ -560,8 +564,12 @@ switch(a)
 #### Nested loops
 
 - `for loops` could be more useful after all, as we can make nested loops with them - it is possible to make them with `while` loops, but they will have more lines of code
+- The nested loop can manipulate any data type, but works best on data that's organized in a table or grid.
 
 ### Functions
+
+- Use a function when you use the same statements to perform the same process repeatedly
+- Use a function to handle a specific task
 
 #### `getchar()`
 
