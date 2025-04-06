@@ -65,6 +65,8 @@ int main()
 ----
 
 * Variables local to a specific function that retain their values after the function quits
+* A static variable inside a function keeps its value between invocations.
+* A static global variable or function is "seen" only in the file in which it's declared.
 
 ===== `extern`
 
@@ -646,7 +648,7 @@ type name(arguments)
 ** Write a prototype statement at the top of the source code
 ** It's a statement so it ends with a semicolon `;`
 
-=== `main()`
+==== `main()`
 
 * `argc` - argument count, the number of arguments passed to the program from the command line
 * `argv` - argument vector, an array of strings (character pointers) that contain the arguments passed to the program from the command line
@@ -683,6 +685,10 @@ int main(int argc, char *argv[])
 ** Explore mazes and other repetitive-decision puzzles
 ** Calculate complex mathematics, such as continued fractions
 * the recursive function ust unwind
+
+==== `scanf()` vs `fgets()`
+
+The `fgets()` approach is generally safer for string input as it handles spaces better and prevents buffer overflows, while `scanf("%s", ...)` will stop at whitespace and has no built-in length protection.
 
 ==== `getchar()`
 
@@ -736,3 +742,98 @@ while(a <= 5)
 // 4
 // 5
 ----
+
+=== Arrays and Structures
+
+==== Arrays
+
+Array is a collection of variables, all of the same data type
+
+* Is a variable
+* Has a data type and a name followedby square brackets, `[]`
+* Within the brackets is the number of elements within the array:
+
+[source,c]
+----
+float highscore[5]; // 5 elements of float type
+----
+
+* Or we can omit the number of elements, and the compiler will set the size of the array based on the number of elements in the initialization list:
+
+[source,c]
+----
+float highscore[] = { 1.0, 2.0, 3.0, 4.0, 5.0 };
+----
+
+* Arrays in C are not dynamic
+* You cannot alter the nuber of elements in an array as the program runs
+* Use a pointer to create a dynamic memory buffer (a type of array)
+* Arrays have no bounds-checking
+* It's possible to reference elements that don't exist
+* Track an array's size in your code
+
+*Multi-dimensional arrays*
+
+* Multi-dimensional array notation is purely for your benefit as the compiler sees all arrays internally in one dimension.
+
+==== Structures
+
+* A structure is a container for multiple data types
+* Inside the structure there are 'members'
+
+*Using a Structure*
+
+* Create a variable of a defined structure type
+* The structure must already be defined before a variable can be set
+* It's common to both define a structure and declare a structure variable in the same statement
+
+*Structure Members and Variables*
+
+* A structure's data is accessed through its members
+* Members are referenced by using the structure's variable name, a dot, and then the member's name
+* Structure members work like any variable
+
+
+* The structure's variable name is `center`
+* The shorter way to assign values
+[source,c]
+----
+struct pixel {
+    int horz;
+    int vert;
+    char color;
+} center = { 320, 240, 'r' };
+
+// Referencing variables:
+printf("X: %d\n", center.horz);
+printf("Y: %d\n", center.vert);
+printf("Color: %c\n", center.color);
+----
+
+===== Nested Structures
+
+[source,c]
+----
+	struct date {
+		int month;
+		int day;
+		int year;
+	};
+	struct person {
+		struct date birthday;
+		char name[32];
+	} president = {
+		{ 2, 22, 1732 },
+		"George Washington"
+	};
+
+	printf("%s was born on %d/%d/%d\n",
+			president.name,
+			president.birthday.month,
+			president.birthday.day,
+			president.birthday.year
+		  );
+// Output:
+// George Washington was born on 2/22/1732
+----
+
