@@ -688,7 +688,10 @@ int main(int argc, char *argv[])
 
 ==== `scanf()` vs `fgets()`
 
-The `fgets()` approach is generally safer for string input as it handles spaces better and prevents buffer overflows, while `scanf("%s", ...)` will stop at whitespace and has no built-in length protection.
+* The `fgets()` approach is generally safer for string input as it handles spaces better and prevents buffer overflows, while `scanf("%s", ...)` will stop at whitespace and has no built-in length protection.
+* `scanf()` stops reading input at the first whitespace character(Enter, Tab and newline), so it is not suitable for reading strings with spaces. Another issue is the overflow problem, as `scanf()` does not check the length of the input string and can cause buffer overflow if the input is longer than the buffer size.
+* For `fgets()` setting the second argument to same size as the buffer ensures the buffer doesn't overflow.
+
 
 ==== `getchar()`
 
@@ -837,3 +840,79 @@ printf("Color: %c\n", center.color);
 // George Washington was born on 2/22/1732
 ----
 
+=== Characters and Strings
+
+==== Characters
+
+`EOF` - end of file, a special character that indicates the end of a file or stream
+
+* In Unix it's `CTRL+D`
+* In Windows it's `CTRL+Z`
+
+* Values used with single-character I/O functions are `int` values to catch special values that may be returned from I/O redirection, such as the EOF condition. Beyond catching special values, the functions themselves are prototyped as accepting or returning integer values
+
+==== C-type functions
+
+* Functions that test characters are called `is functions`
+* Functions that convert characters are called `to functions`
+
+*Character-Testing Functions examples*:
+
+* `isalpha()` - checks if a character is an alphabetic letter
+* `isdigit()` - checks if a character is a digit
+* `isupper()` - checks if a character is uppercase
+* `islower()` - checks if a character is lowercase
+
+*Character Conversion Functions examples*:
+
+* `toupper()` - converts a character to uppercase
+
+==== Strings
+
+* Character array represents a string
+* The final character in the array must be a null character - it terminates the string
+* The null character isn't counted in the string length
+* Storage must be allocated for the null character
+* `\0` is the same as NULL (pointer constant)
+
+*Declaring a String*
+
+[source,c]
+----
+    char string[] = "Hello, world!\n";
+----
+
+* The compiler allocated stoage at compile time
+* The null character is appended automatically to string literals
+
+*Creating String Storage*
+
+* Set aside buffer size for all the text plus the null character
+* The string can be shorter, but the null character is always the last character
+
+*Beware of String Overflow*
+
+* Putting more characters into a string buffer is overflow
+* Ensure that strings never overflow
+* Monitor character input to ensure that buffers don't overflow
+
+*C Library String Functions*
+
+* The C library comes with many string functions
+* String functions are prototyped in the `string.h` header filer
+* `strlen()` - returns the length of a string (not including the null character)
+* `strstr()` - returns a pointer to the first occurrence of a substring in a string
+* `strcpy()` - copies a string to another string
+* `strcat()` - concatenates two strings
+
+*C String Limitations*
+
+* Operators are not used to manipulate a string in C
+* Write your own string manipulation functions
+* Remember that null character at the end of the string
+
+*Things to remember when manipulating string*
+
+* Ensure that the character buffer has enough storage
+* Always include room for the null character at the end of the string
+* String functions automatically deal with the null character
