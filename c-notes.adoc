@@ -1127,6 +1127,7 @@ int main()
 `malloc()` function allocates memory and is defined in the `stdlib.h` header file
 
 * Argument is the number of bytes desired (`size_t value`)
+** It's a good practice to use the `sizeof` operator to determine the size of the data type
 * Return values is an address - location where the buffer exists in memory
 * On error, the `NULL` constant is returned
 
@@ -1175,4 +1176,112 @@ int main()
 }
 ----
 
+==== Pointer array
 
+* This idea is way more efficient than creating a two dimnesional character array
+** The array only stores pointers (typically 4 or 8 bytes each), not the actual strings
+* It's easier to swap the strings
+** Addresses have been swapped, not strings
+
+[source, c]
+----
+int main()
+{
+    char *veeps[5] = {"Adams", "Jefferson", "Burr", "Clinton", "Gerry"};
+
+    // Strings swap
+    char *temp;
+    temp = veeps[1];
+    veeps[1] = veeps[2];
+    veeps[2] = temp;
+
+    return 0;
+}
+----
+
+===== Drafted double asterisk notation
+
+[source, c]
+----
+int main()
+{
+    // Reference first character in the string
+    for (x=0; x<5; x++)    
+        printf("%c\n", **(veeps+x));
+
+        // veeps + x - base address of the string
+        *(veeps + x) // the string
+        **(veeps + x) //  first character in the string
+        *(*(veeps + x)+1) // second character in the string
+
+        // Output:
+        // A
+        // J
+        // B
+        // C
+        // G
+
+    return 0;
+}
+----
+
+==== Pointers in structures
+
+Both work together in two ways:
+1. Have a pointer member in a structure
+2. Have entire structure as a pointer
+
+[source, c]
+----
+int main()
+{
+    struct person {
+        char name[32];
+        int age;
+    } *you; //pointer variable - unassigned person structure address
+
+    you = malloc(sizeof(struct person)); // Allocate memory for the structure
+    if (you == NULL) // Check if the memory allocation was successful
+    {
+        puts("Unable to allocate memory");
+        exit(1);
+    }
+
+    // This structure is a pointer, the structure member operator (->, not . ) is required when referencing structure members
+
+    printf("Enter your name: ");
+    fgets(you->name, sizeof(you->name), stdin); // Use fgets to read a string with spaces
+
+    return 0;
+}
+----
+
+==== Passing pointer to the function
+
+[source, c]
+----
+
+void doubler(int *alpha) // *alpha is a pointer (address) to an integer
+{
+    *alpha += *alpha; // Double the value pointed to by alpha
+    // Contents of the address pointed to by alpha is changed
+}
+
+int main()
+{
+    int a = 25;
+
+    printf("Before: %d\n", a);
+    doubler(&a);
+    printf("After: %d\n", a);
+
+    return 0;
+}
+
+----
+
+* When we provide an address to a variable using `&` the datatype of the variable is not changed
+
+==== Returning pointers from functions 
+
+* 
