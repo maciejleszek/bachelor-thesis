@@ -1,0 +1,5 @@
+Uid,Sid,Identifier,Model,Name,Alias,Status,CreateTime,UpdateTime
+8278074507,895438322,895438322,miwear.watch.n66gl,Xiaomi Smart Band 9   ,,2,1736852037618751426,1766059132530353395
+8278074507,2016481816,2016481816,miwear.watch.o66gl,Xiaomi Smart Band 10   ,,1,1764161055301746443,1764161055301746543
+8278074507,xiaomiwear_app,xiaomiwear_app,mihlth.xiaomi.fitness.app,Mi Fitness,,2,1736852008113853086,1738151796135979210
+8278074507,xiaomiwear_app_manually,xiaomiwear_app_manually,mihlth.xiaomi.fitness.manually,Add data,,2,1736852008113678627,1738151796135752061
