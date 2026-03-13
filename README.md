@@ -7,6 +7,8 @@ Technologies used so far:
 - Python
 - Pandas
 - Numpy
+- UV
 - JSON
 - XML
+- CSV
 - Tableau
