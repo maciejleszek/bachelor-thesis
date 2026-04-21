@@ -14,8 +14,8 @@ SOUND_PIN = 27
 GPIO.setup(PIR_PIN, GPIO.IN)
 GPIO.setup(SOUND_PIN, GPIO.IN)
 
-# --- Inicjalizacja DHT11 ---
-dht_device = adafruit_dht.DHT11(board.D4)
+# --- Inicjalizacja DHT22 ---
+dht_device = adafruit_dht.DHT22(board.D4)
 
 # --- DataFrame do przechowywania danych ---
 columns = ['timestamp', 'temperature', 'humidity', 'motion', 'sound']
@@ -23,13 +23,13 @@ data = pd.DataFrame(columns=columns)
 
 # --- Funkcje do odczytu czujników ---
 
-def read_dht11():
+def read_dht22():
     try:
         temperature = dht_device.temperature
         humidity = dht_device.humidity
         return temperature, humidity
     except Exception as e:
-        print("Błąd DHT11:", e)
+        print("Błąd DHT22:", e)
         return None, None
 
 def read_motion():
@@ -44,7 +44,7 @@ def collect_data():
     while True:
         timestamp = pd.Timestamp.now()
 
-        temp, hum = read_dht11()
+        temp, hum = read_dht22()
         motion = read_motion()
         sound = read_sound()
 
