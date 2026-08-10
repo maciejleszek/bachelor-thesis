@@ -1,0 +1,23 @@
+# Zależności
+node_modules
+npm-debug.log
+
+# Pliki po zbudowaniu
+build
+dist
+
+# Pliki środowiskowe (nie powinny trafiać do obrazu ze względów bezpieczeństwa)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Pliki systemowe Maca
+.DS_Store
+
+# Pliki kontroli wersji i Dockera
+.git
+Dockerfile
+.dockerignore
+docker-compose.yml

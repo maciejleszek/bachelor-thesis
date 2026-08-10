@@ -9,6 +9,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Playwright Chromium — potrzebny do pierwszego logowania Garmin
+RUN pip install playwright && playwright install --with-deps chromium
+
 COPY . .
 
 # Jednorazowe logowanie Garmin (generuje tokeny)

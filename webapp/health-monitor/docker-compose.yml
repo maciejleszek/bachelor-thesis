@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U health"]
+      test: [ "CMD-SHELL", "pg_isready -U health" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -28,13 +28,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
 
   frontend:
     build: ./frontend
     container_name: health_frontend
     restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
     depends_on:
       - backend
 
@@ -50,5 +50,27 @@ services:
       - frontend
       - backend
 
+  sync:
+    build: ./sync
+    container_name: health_sync
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://health:${DB_PASSWORD:-changeme}@db:5432/health
+      GARMIN_EMAIL: ${GARMIN_EMAIL}
+      GARMIN_PASSWORD: ${GARMIN_PASSWORD}
+      GARMIN_TOKEN_DIR: /data/garmin_tokens
+      MIBAND_MODE: file
+      MIBAND_IMPORT_DIR: /data/miband_imports
+      XIAOMI_EMAIL: ${XIAOMI_EMAIL:-}
+      XIAOMI_PASSWORD: ${XIAOMI_PASSWORD:-}
+      XIAOMI_REGION: ${XIAOMI_REGION:-us}
+    volumes:
+      - sync_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  sync_data:
+
