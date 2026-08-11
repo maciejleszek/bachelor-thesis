@@ -1,6 +1,10 @@
 # Custom
 data/
 
+# Zaimportowane dane osobiste (Mi Band JSON exports)
+webapp/health-monitor/miband_imports/*
+!webapp/health-monitor/miband_imports/.gitkeep
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -210,3 +214,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# macOS
+.DS_Store

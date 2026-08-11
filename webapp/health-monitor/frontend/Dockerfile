@@ -1,16 +1,12 @@
-FROM python:3.12-slim
-
-# Playwright wymaga zależności systemowych
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM node:20-alpine
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN npm install -g npm@11
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 
-# Jednorazowe logowanie Garmin (generuje tokeny)
-# Uruchamiane ręcznie przez: docker compose run sync python garmin_login.py
-CMD ["python", "scheduler.py"]
+ENV HOST=0.0.0.0
+EXPOSE 3000
+CMD ["npm", "start"]
