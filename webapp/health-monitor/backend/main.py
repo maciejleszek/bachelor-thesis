@@ -110,10 +110,23 @@ async def get_metrics(
     if source:
         where += " AND source = :source"
         params["source"] = source
-    rows = await database.fetch_all(
-        f"SELECT * FROM daily_metrics {where} ORDER BY date DESC",
-        params
-    )
+        rows = await database.fetch_all(
+            f"SELECT * FROM daily_metrics {where} ORDER BY date DESC",
+            params
+        )
+    else:
+        # Brak filtra źródła: łączymy oba urządzenia w jeden wiersz na dzień
+        # (Garmin preferowany, Mi Band jako uzupełnienie), zamiast zwracać
+        # osobne, dublujące się wiersze dla dni z danymi z obu opasek.
+        rows = await database.fetch_all(
+            f"""SELECT * FROM (
+                    SELECT DISTINCT ON (date) *
+                    FROM daily_metrics {where}
+                    ORDER BY date, (source = 'garmin') DESC
+                ) sub
+                ORDER BY date DESC""",
+            params
+        )
     return [dict(r) for r in rows]
 
 @app.post("/metrics", status_code=201)

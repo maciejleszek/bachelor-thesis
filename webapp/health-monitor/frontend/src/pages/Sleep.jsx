@@ -45,7 +45,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function Sleep() {
-  const [source, setSource] = useState("garmin");
+  const [source, setSource] = useState("");
   const [days, setDays] = useState("90");
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,9 +107,9 @@ export default function Sleep() {
 
       <div style={{ display: "flex", gap: 10, marginBottom: "var(--gap)" }}>
         <select style={{ ...selectStyle, flex: 1 }} value={source} onChange={e => setSource(e.target.value)}>
-          <option value="garmin">Garmin</option>
-          <option value="miband">Mi Band</option>
-          <option value="">Wszystkie źródła</option>
+          <option value="">Garmin + Mi Band</option>
+          <option value="garmin">Tylko Garmin</option>
+          <option value="miband">Tylko Mi Band</option>
         </select>
         <select style={{ ...selectStyle, flex: 1 }} value={days} onChange={e => setDays(e.target.value)}>
           {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
