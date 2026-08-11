@@ -3,21 +3,27 @@ Mi Band (Xiaomi Health) → PostgreSQL sync
 
 Dwa tryby działania:
   1. CLOUD — nieoficjalne Xiaomi Health API (OAuth2, działa podobnie jak Mi-Fitness-Sync)
-  2. FILE  — obserwuje folder /data/miband_imports/ i automatycznie parsuje
-             wrzucone pliki JSON (eksportowane ręcznie ze strony account.xiaomi.com)
+  2. FILE  — obserwuje folder /data/miband_imports/ i automatycznie parsuje:
+             - pojedyncze pliki JSON (stary format, ręczny eksport z account.xiaomi.com)
+             - rozpakowane foldery eksportu "Pobierz moje dane" z aplikacji Mi Fitness
+               (Ustawienia > Prywatność > Zarządzaj moimi danymi), rozpoznawane po
+               pliku *hlth_center_aggregated_fitness_data.csv w środku
 
 Tryb wybierany przez zmienną MIBAND_MODE=cloud|file (domyślnie: file)
 """
 
 import os
 import json
+import csv
 import asyncio
 import asyncpg
 import logging
 import hashlib
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
+
+import garmin_sync  # reużywamy has_useful_data (te same reguły co dla Garmina)
 
 load_dotenv()
 log = logging.getLogger("miband_sync")
@@ -112,6 +118,65 @@ def _parse_xiaomi_json(data: dict) -> list[dict]:
     return rows
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# TRYB FILE — parser eksportu "Pobierz moje dane" z aplikacji Mi Fitness
+# (Ustawienia > Prywatność > Zarządzaj moimi danymi > Pobierz kopię danych)
+# ══════════════════════════════════════════════════════════════════════════════
+
+AGGREGATED_CSV_GLOB = "*hlth_center_aggregated_fitness_data.csv"
+
+
+def _mifitness_date(ts) -> date:
+    return datetime.fromtimestamp(int(ts), tz=timezone.utc).date()
+
+
+def _parse_mifitness_aggregated_csv(csv_path: Path) -> list[dict]:
+    """Parsuje hlth_center_aggregated_fitness_data.csv — jeden wiersz na
+    (dzień, kategoria: heart_rate/sleep/spo2/steps/stress/calories/...).
+    Grupuje wg dnia i buduje wiersze gotowe do daily_metrics."""
+    days: dict = {}
+    with csv_path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            # Plik ma też wiersze Tag="daily_mark" (puste znaczniki
+            # {"has_data":true}) i "daily_fitness" (cele) pod tymi samymi
+            # Key co prawdziwe dane — musimy brać tylko "daily_report",
+            # inaczej znaczniki nadpisują realne wartości.
+            if row.get("Tag") != "daily_report":
+                continue
+            key = row.get("Key")
+            ts = row.get("Time")
+            raw_value = row.get("Value")
+            if not key or not ts or not raw_value:
+                continue
+            try:
+                d = _mifitness_date(ts)
+                value = json.loads(raw_value)
+            except (ValueError, OSError, json.JSONDecodeError):
+                continue
+
+            day = days.setdefault(d, {"date": d, "source": "miband"})
+            if key == "heart_rate":
+                day["avg_hr"] = value.get("avg_hr")
+                day["max_hr"] = value.get("max_hr")
+                day["resting_hr"] = value.get("avg_rhr")
+            elif key == "spo2":
+                day["spo2"] = value.get("avg_spo2") or None
+            elif key == "steps":
+                day["steps"] = value.get("steps")
+            elif key == "stress":
+                day["avg_stress"] = value.get("avg_stress")
+                day["max_stress"] = value.get("max_stress")
+            elif key == "sleep":
+                day["sleep_total_min"] = value.get("total_duration")
+                day["sleep_deep_min"] = value.get("sleep_deep_duration")
+                day["sleep_light_min"] = value.get("sleep_light_duration")
+                day["sleep_rem_min"] = value.get("sleep_rem_duration")
+                day["sleep_score"] = value.get("sleep_score")
+
+    return [d for d in days.values() if garmin_sync.has_useful_data(d)]
+
+
 async def _upsert_metrics(conn, row: dict):
     await conn.execute("""
         INSERT INTO daily_metrics
@@ -145,37 +210,58 @@ def _file_hash(path: Path) -> str:
 
 
 async def process_import_dir(conn) -> int:
-    """Skanuje IMPORT_DIR, parsuje nowe JSON-y, zapisuje do bazy."""
+    """Skanuje IMPORT_DIR: pojedyncze pliki JSON (stary format) oraz
+    rozpakowane foldery eksportu Mi Fitness (CSV) — parsuje nowe, zapisuje do bazy."""
     IMPORT_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DB.mkdir(parents=True, exist_ok=True)
 
-    json_files = list(IMPORT_DIR.glob("*.json"))
-    if not json_files:
-        log.info("[MiBand/file] Brak nowych plików JSON w %s", IMPORT_DIR)
-        return 0
-
     total = 0
+
+    json_files = list(IMPORT_DIR.glob("*.json"))
     for fp in json_files:
         fhash = _file_hash(fp)
         marker = PROCESSED_DB / fhash
-
         if marker.exists():
             log.debug("[MiBand/file] Pominięto (już przetworzone): %s", fp.name)
             continue
-
         log.info("[MiBand/file] Przetwarzam: %s", fp.name)
         try:
             raw = json.loads(fp.read_text(encoding="utf-8"))
             rows = _parse_xiaomi_json(raw)
             for row in rows:
                 await _upsert_metrics(conn, row)
-            marker.touch()   # oznacz jako przetworzone
+            marker.touch()
             total += len(rows)
             log.info("[MiBand/file] ✓ %s — %d rekordów", fp.name, len(rows))
         except json.JSONDecodeError as e:
             log.error("[MiBand/file] Błąd JSON w %s: %s", fp.name, e)
         except Exception as e:
             log.error("[MiBand/file] Błąd przetwarzania %s: %s", fp.name, e)
+
+    export_dirs = [d for d in IMPORT_DIR.iterdir() if d.is_dir() and d.name != ".processed"]
+    for edir in export_dirs:
+        matches = list(edir.glob(AGGREGATED_CSV_GLOB))
+        if not matches:
+            continue
+        csv_path = matches[0]
+        fhash = _file_hash(csv_path)
+        marker = PROCESSED_DB / fhash
+        if marker.exists():
+            log.debug("[MiBand/export] Pominięto (już przetworzone): %s", edir.name)
+            continue
+        log.info("[MiBand/export] Przetwarzam: %s", csv_path.name)
+        try:
+            rows = _parse_mifitness_aggregated_csv(csv_path)
+            for row in rows:
+                await _upsert_metrics(conn, row)
+            marker.touch()
+            total += len(rows)
+            log.info("[MiBand/export] ✓ %s — %d dni", edir.name, len(rows))
+        except Exception as e:
+            log.error("[MiBand/export] Błąd przetwarzania %s: %s", edir.name, e)
+
+    if total == 0 and not json_files and not export_dirs:
+        log.info("[MiBand/file] Brak nowych plików/folderów w %s", IMPORT_DIR)
 
     return total
 
