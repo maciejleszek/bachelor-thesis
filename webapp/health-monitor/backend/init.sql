@@ -44,10 +44,11 @@ CREATE TABLE IF NOT EXISTS blood_pressure (
     notes      TEXT
 );
 
--- Aktywności / treningi (Garmin)
+-- Aktywności / treningi (Garmin + Mi Band)
 CREATE TABLE IF NOT EXISTS activities (
     id                 SERIAL PRIMARY KEY,
-    garmin_activity_id BIGINT UNIQUE NOT NULL,
+    garmin_activity_id BIGINT UNIQUE NOT NULL,  -- dla Mi Band: syntetyczne ujemne ID
+    source             VARCHAR(32) NOT NULL DEFAULT 'garmin',  -- 'garmin' | 'miband'
     name               TEXT,
     sport_type         VARCHAR(64) NOT NULL,   -- typeKey: running, cycling, swimming, ...
     start_time         TIMESTAMPTZ NOT NULL,

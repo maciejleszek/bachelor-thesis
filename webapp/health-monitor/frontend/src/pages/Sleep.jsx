@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import MetricCard from "../components/MetricCard";
@@ -138,15 +138,16 @@ export default function Sleep() {
 
           {chartData.length > 0 && (
             <div className="chart-wrap">
-              <div className="card-title">Skład snu — ostatnie noce</div>
+              <div className="card-title">Skład snu — ostatnie {chartData.length} nocy</div>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="date" tick={{ fill: "var(--muted)", fontSize: 10 }} />
                   <YAxis tick={{ fill: "var(--muted)", fontSize: 11 }} unit="min" />
                   <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
                   <Bar dataKey="Głęboki" stackId="sleep" fill="var(--accent)" />
-                  <Bar dataKey="Płytki" stackId="sleep" fill="var(--surface2)" stroke="var(--border)" />
+                  <Bar dataKey="Płytki" stackId="sleep" fill="#6b7394" />
                   <Bar dataKey="REM" stackId="sleep" fill="#9c8fff" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

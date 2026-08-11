@@ -49,6 +49,7 @@ DETAILS_REQUEST_DELAY = float(os.getenv("GARMIN_ACTIVITIES_DETAILS_DELAY", "0.3"
 def _parse_activity(a: dict) -> dict:
     return {
         "garmin_activity_id": a.get("activityId"),
+        "source":             "garmin",
         "name":               a.get("activityName"),
         "sport_type":         (a.get("activityType") or {}).get("typeKey") or "unknown",
         "start_time":         _parse_start_time(a),
@@ -73,12 +74,12 @@ async def _upsert_activity(conn, row: dict):
         return
     await conn.execute("""
         INSERT INTO activities
-            (garmin_activity_id, name, sport_type, start_time, duration_sec,
+            (garmin_activity_id, source, name, sport_type, start_time, duration_sec,
              distance_m, calories, avg_hr, max_hr, avg_speed_mps, max_speed_mps,
              elevation_gain_m, aerobic_te, anaerobic_te, training_load, raw)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         ON CONFLICT (garmin_activity_id) DO UPDATE SET
-            name=EXCLUDED.name, sport_type=EXCLUDED.sport_type,
+            source=EXCLUDED.source, name=EXCLUDED.name, sport_type=EXCLUDED.sport_type,
             start_time=EXCLUDED.start_time, duration_sec=EXCLUDED.duration_sec,
             distance_m=EXCLUDED.distance_m, calories=EXCLUDED.calories,
             avg_hr=EXCLUDED.avg_hr, max_hr=EXCLUDED.max_hr,
@@ -87,7 +88,8 @@ async def _upsert_activity(conn, row: dict):
             anaerobic_te=EXCLUDED.anaerobic_te, training_load=EXCLUDED.training_load,
             raw=EXCLUDED.raw
     """,
-        row["garmin_activity_id"], row["name"], row["sport_type"], row["start_time"],
+        row["garmin_activity_id"], row.get("source", "garmin"), row["name"],
+        row["sport_type"], row["start_time"],
         row["duration_sec"], row["distance_m"], row["calories"], row["avg_hr"],
         row["max_hr"], row["avg_speed_mps"], row["max_speed_mps"],
         row["elevation_gain_m"], row["aerobic_te"], row["anaerobic_te"],

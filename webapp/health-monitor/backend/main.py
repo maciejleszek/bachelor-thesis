@@ -175,7 +175,7 @@ async def get_activities(
         where += " AND sport_type = :sport_type"
         params["sport_type"] = sport_type
     rows = await database.fetch_all(
-        f"""SELECT id, garmin_activity_id, name, sport_type, start_time,
+        f"""SELECT id, garmin_activity_id, source, name, sport_type, start_time,
                    duration_sec, distance_m, calories, avg_hr, max_hr,
                    avg_speed_mps, max_speed_mps, elevation_gain_m,
                    aerobic_te, anaerobic_te, training_load

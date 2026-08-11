@@ -13,6 +13,11 @@ const SPORT_ICONS = {
   walking: "🚶", hiking: "🥾",
   strength_training: "🏋️", cardio_training: "❤️",
   yoga: "🧘", fitness_equipment: "🏋️",
+  // Mi Band (klucze z eksportu Mi Fitness)
+  outdoor_running: "🏃", indoor_running: "🏃",
+  outdoor_riding: "🚴", indoor_riding: "🚴",
+  outdoor_walking: "🚶", outdoor_hiking: "🥾",
+  outdoor_skating: "⛸️", zumba: "💃", free_training: "🏋️",
 };
 const sportIcon = (t) => SPORT_ICONS[t] || "🏅";
 const sportLabel = (t) => (t || "unknown").replaceAll("_", " ");
@@ -52,7 +57,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-function ActivityDetails({ activityId }) {
+function ActivityDetails({ activityId, source }) {
   const [details, setDetails] = useState(null);
   const [error, setError] = useState(false);
 
@@ -67,7 +72,13 @@ function ActivityDetails({ activityId }) {
   if (error) return <div className="form-hint">Nie udało się pobrać szczegółów.</div>;
   if (!details) return <div className="form-hint">Ładowanie szczegółów…</div>;
   if (!details.has_details) {
-    return <div className="form-hint">Brak splitów/stref HR dla tej aktywności (Garmin ich nie udostępnił, albo jeszcze nie zsynchronizowane — patrz README: --details-backfill).</div>;
+    return (
+      <div className="form-hint">
+        {source === "miband"
+          ? "Mi Band nie udostępnia w eksporcie splitów ani stref tętna dla treningów."
+          : "Brak splitów/stref HR dla tej aktywności — jeszcze nie zsynchronizowane (patrz README: --details-backfill)."}
+      </div>
+    );
   }
 
   const zoneData = details.hr_zones.map(z => ({
@@ -228,7 +239,9 @@ export default function Sport() {
 
           {chartData.length > 0 && (
             <div className="chart-wrap">
-              <div className="card-title">Dystans — trend tygodniowy</div>
+              <div className="card-title">
+                Dystans — trend tygodniowy ({sportType ? sportLabel(sportType) : "wszystkie dyscypliny"})
+              </div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -262,8 +275,9 @@ export default function Sport() {
                       <div style={{ fontSize: "1.1rem", marginTop: 4 }}>{sportIcon(a.sport_type)}</div>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                        {a.name || sportLabel(a.sport_type)}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600 }}>{a.name || sportLabel(a.sport_type)}</span>
+                        <span className={`badge badge-${a.source}`}>{a.source}</span>
                       </div>
                       <div className="survey-pills">
                         {a.distance_m != null && <span className="pill">📏 {formatDistance(a.distance_m)}</span>}
@@ -273,7 +287,7 @@ export default function Sport() {
                       </div>
                     </div>
                   </div>
-                  {expandedId === a.id && <ActivityDetails activityId={a.id} />}
+                  {expandedId === a.id && <ActivityDetails activityId={a.id} source={a.source} />}
                 </div>
               ))
             )}

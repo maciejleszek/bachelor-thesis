@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ComposedChart, Scatter, LineChart, Line, XAxis, YAxis, Tooltip,
+  ComposedChart, Scatter, LineChart, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import { api } from "../api";
@@ -195,6 +195,7 @@ export default function Analysis() {
                   <YAxis yAxisId="left" domain={[0, 100]} tick={{ fill: "var(--muted)", fontSize: 11 }} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fill: "var(--muted)", fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
                   <Line yAxisId="left" type="monotone" dataKey="Stres" stroke="var(--warn)"
                     strokeWidth={2} dot={{ r: 2 }} connectNulls />
                   <Line yAxisId="right" type="monotone" dataKey={metricLabel(metric)} stroke="var(--accent)"

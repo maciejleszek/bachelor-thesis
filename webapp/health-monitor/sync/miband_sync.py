@@ -23,7 +23,8 @@ from datetime import date, timedelta, datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
-import garmin_sync  # reużywamy has_useful_data (te same reguły co dla Garmina)
+import garmin_sync             # reużywamy has_useful_data (te same reguły co dla Garmina)
+import garmin_activities_sync  # reużywamy _upsert_activity (ta sama tabela activities)
 
 load_dotenv()
 log = logging.getLogger("miband_sync")
@@ -177,6 +178,59 @@ def _parse_mifitness_aggregated_csv(csv_path: Path) -> list[dict]:
     return [d for d in days.values() if garmin_sync.has_useful_data(d)]
 
 
+SPORT_RECORD_CSV_GLOB = "*hlth_center_sport_record.csv"
+
+
+def _parse_mifitness_sport_record_csv(csv_path: Path) -> list[dict]:
+    """Parsuje hlth_center_sport_record.csv — jeden wiersz na trening
+    (bieganie, rower, siłownia, ...). Buduje wiersze gotowe dla
+    garmin_activities_sync._upsert_activity (ta sama tabela `activities`,
+    z source='miband'). ID aktywności syntetyzujemy jako -Time (unikalne,
+    nie koliduje z dodatnimi ID z Garmina)."""
+    rows = []
+    with csv_path.open(encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            key = row.get("Key")        # np. "outdoor_running"
+            ts = row.get("Time")
+            raw_value = row.get("Value")
+            if not key or not ts or not raw_value:
+                continue
+            try:
+                value = json.loads(raw_value)
+                synthetic_id = -int(ts)
+                start_time = datetime.fromtimestamp(
+                    int(value.get("start_time") or ts), tz=timezone.utc)
+            except (ValueError, json.JSONDecodeError):
+                continue
+
+            avg_speed_kmh = value.get("avg_speed")
+            max_speed_kmh = value.get("max_speed")
+            distance = value.get("distance") or None
+
+            rows.append({
+                "garmin_activity_id": synthetic_id,
+                "source":             "miband",
+                "name":               None,
+                "sport_type":         key,
+                "start_time":         start_time,
+                "duration_sec":       value.get("duration"),
+                "distance_m":         distance,
+                "calories":           value.get("calories") or value.get("total_cal"),
+                "avg_hr":             value.get("avg_hrm"),
+                "max_hr":             value.get("max_hrm"),
+                # Mi Band podaje prędkość w km/h, u nas kolumna jest w m/s
+                "avg_speed_mps":      (avg_speed_kmh * 1000 / 3600) if avg_speed_kmh else None,
+                "max_speed_mps":      (max_speed_kmh * 1000 / 3600) if max_speed_kmh else None,
+                "elevation_gain_m":   value.get("rise_height") or None,
+                "aerobic_te":         value.get("train_effect"),
+                "anaerobic_te":       value.get("anaerobic_train_effect"),
+                "training_load":      value.get("train_load"),
+                "raw":                json.dumps(value),
+            })
+    return rows
+
+
 async def _upsert_metrics(conn, row: dict):
     await conn.execute("""
         INSERT INTO daily_metrics
@@ -240,25 +294,45 @@ async def process_import_dir(conn) -> int:
 
     export_dirs = [d for d in IMPORT_DIR.iterdir() if d.is_dir() and d.name != ".processed"]
     for edir in export_dirs:
+        # Dzienne metryki (heart_rate/sleep/spo2/steps/stress)
         matches = list(edir.glob(AGGREGATED_CSV_GLOB))
-        if not matches:
-            continue
-        csv_path = matches[0]
-        fhash = _file_hash(csv_path)
-        marker = PROCESSED_DB / fhash
-        if marker.exists():
-            log.debug("[MiBand/export] Pominięto (już przetworzone): %s", edir.name)
-            continue
-        log.info("[MiBand/export] Przetwarzam: %s", csv_path.name)
-        try:
-            rows = _parse_mifitness_aggregated_csv(csv_path)
-            for row in rows:
-                await _upsert_metrics(conn, row)
-            marker.touch()
-            total += len(rows)
-            log.info("[MiBand/export] ✓ %s — %d dni", edir.name, len(rows))
-        except Exception as e:
-            log.error("[MiBand/export] Błąd przetwarzania %s: %s", edir.name, e)
+        if matches:
+            csv_path = matches[0]
+            fhash = _file_hash(csv_path)
+            marker = PROCESSED_DB / fhash
+            if marker.exists():
+                log.debug("[MiBand/export] Pominięto (już przetworzone): %s", csv_path.name)
+            else:
+                log.info("[MiBand/export] Przetwarzam: %s", csv_path.name)
+                try:
+                    rows = _parse_mifitness_aggregated_csv(csv_path)
+                    for row in rows:
+                        await _upsert_metrics(conn, row)
+                    marker.touch()
+                    total += len(rows)
+                    log.info("[MiBand/export] ✓ %s — %d dni", edir.name, len(rows))
+                except Exception as e:
+                    log.error("[MiBand/export] Błąd przetwarzania %s: %s", edir.name, e)
+
+        # Treningi/aktywności (biegi, rower, siłownia, ...)
+        sport_matches = list(edir.glob(SPORT_RECORD_CSV_GLOB))
+        if sport_matches:
+            sport_csv = sport_matches[0]
+            sport_hash = _file_hash(sport_csv)
+            sport_marker = PROCESSED_DB / sport_hash
+            if sport_marker.exists():
+                log.debug("[MiBand/export] Pominięto (już przetworzone): %s", sport_csv.name)
+            else:
+                log.info("[MiBand/export] Przetwarzam: %s", sport_csv.name)
+                try:
+                    activity_rows = _parse_mifitness_sport_record_csv(sport_csv)
+                    for a_row in activity_rows:
+                        await garmin_activities_sync._upsert_activity(conn, a_row)
+                    sport_marker.touch()
+                    total += len(activity_rows)
+                    log.info("[MiBand/export] ✓ %s — %d treningów", edir.name, len(activity_rows))
+                except Exception as e:
+                    log.error("[MiBand/export] Błąd przetwarzania %s: %s", sport_csv.name, e)
 
     if total == 0 and not json_files and not export_dirs:
         log.info("[MiBand/file] Brak nowych plików/folderów w %s", IMPORT_DIR)

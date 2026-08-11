@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+  LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid
 } from "recharts";
 import MetricCard from "../components/MetricCard";
 import { api } from "../api";
@@ -125,6 +125,7 @@ export default function Dashboard() {
               <XAxis dataKey="date" tick={{ fill: "var(--muted)", fontSize: 11 }} />
               <YAxis tick={{ fill: "var(--muted)", fontSize: 11 }} />
               <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
               <Line type="monotone" dataKey="HR" name="HR" stroke="var(--danger)"
                 strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="Stres" name="Stres" stroke="var(--warn)"
