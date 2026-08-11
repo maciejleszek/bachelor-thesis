@@ -44,6 +44,32 @@ CREATE TABLE IF NOT EXISTS blood_pressure (
     notes      TEXT
 );
 
+-- Aktywności / treningi (Garmin)
+CREATE TABLE IF NOT EXISTS activities (
+    id                 SERIAL PRIMARY KEY,
+    garmin_activity_id BIGINT UNIQUE NOT NULL,
+    name               TEXT,
+    sport_type         VARCHAR(64) NOT NULL,   -- typeKey: running, cycling, swimming, ...
+    start_time         TIMESTAMPTZ NOT NULL,
+    duration_sec       NUMERIC(10,1),
+    distance_m         NUMERIC(10,1),
+    calories           NUMERIC(7,1),
+    avg_hr             NUMERIC(5,1),
+    max_hr             NUMERIC(5,1),
+    avg_speed_mps      NUMERIC(6,3),
+    max_speed_mps      NUMERIC(6,3),
+    elevation_gain_m   NUMERIC(7,1),
+    aerobic_te         NUMERIC(4,1),
+    anaerobic_te       NUMERIC(4,1),
+    training_load      NUMERIC(7,1),
+    raw                JSONB,
+    splits_raw         JSONB,   -- surowa odpowiedź get_activity_splits
+    hr_zones_raw       JSONB,   -- surowa odpowiedź get_activity_hr_in_timezones
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_activities_sport_type ON activities (sport_type);
+CREATE INDEX IF NOT EXISTS idx_activities_start_time ON activities (start_time);
+
 -- Dane środowiskowe (RPi + BME280)
 CREATE TABLE IF NOT EXISTS environment (
     id          SERIAL PRIMARY KEY,

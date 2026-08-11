@@ -107,9 +107,21 @@ def _parse_hrv(hrv_data) -> dict:
     return {"hrv": nightly or weekly}
 
 
-async def sync_day(client, target_date: date, conn) -> bool:
+METRIC_FIELDS = (
+    "avg_hr", "max_hr", "resting_hr", "hrv", "spo2", "steps",
+    "avg_stress", "max_stress", "sleep_total_min", "sleep_deep_min",
+    "sleep_light_min", "sleep_rem_min", "sleep_score",
+)
+
+
+def has_useful_data(row: dict) -> bool:
+    """Czy wiersz zawiera choć jedną realną wartość metryki (nie tylko date/source)."""
+    return any(row.get(k) is not None for k in METRIC_FIELDS)
+
+
+async def fetch_day_metrics(client, target_date: date) -> dict:
+    """Pobiera wszystkie metryki dnia z Garmina, bez zapisu do bazy."""
     ds = target_date.isoformat()
-    log.info("[Garmin] Synchronizuję: %s", ds)
     row = {"date": target_date, "source": "garmin"}
 
     try:
@@ -126,7 +138,8 @@ async def sync_day(client, target_date: date, conn) -> bool:
     try:
         stats = client.get_stats(ds)
         row["steps"] = _safe(stats, "totalSteps")
-        row["spo2"]  = _safe(stats, "averageSpO2")
+        # Klucz w odpowiedzi Garmina to "averageSpo2" (małe "o"), nie "averageSpO2".
+        row["spo2"]  = stats.get("averageSpo2") or stats.get("averageSpO2")
     except Exception as e:
         log.warning("[Garmin] Stats error %s: %s", ds, e)
 
@@ -149,6 +162,13 @@ async def sync_day(client, target_date: date, conn) -> bool:
     except Exception as e:
         log.warning("[Garmin] HRV error %s: %s", ds, e)
 
+    return row
+
+
+async def sync_day(client, target_date: date, conn) -> bool:
+    ds = target_date.isoformat()
+    log.info("[Garmin] Synchronizuję: %s", ds)
+    row = await fetch_day_metrics(client, target_date)
     await _upsert_metrics(conn, row)
     log.info("[Garmin] ✓ %s — HR:%s HRV:%s Stres:%s Kroki:%s",
              ds, row.get("avg_hr"), row.get("hrv"),

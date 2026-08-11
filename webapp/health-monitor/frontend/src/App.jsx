@@ -4,6 +4,9 @@ import Dashboard from "./pages/Dashboard";
 import Survey from "./pages/Survey";
 import History from "./pages/History";
 import Data from "./pages/Data";
+import Sport from "./pages/Sport";
+import Analysis from "./pages/Analysis";
+import Sleep from "./pages/Sleep";
 
 export default function App() {
   return (
@@ -14,6 +17,9 @@ export default function App() {
           <Route path="/survey" element={<Survey />} />
           <Route path="/history" element={<History />} />
           <Route path="/data" element={<Data />} />
+          <Route path="/sport" element={<Sport />} />
+          <Route path="/analysis" element={<Analysis />} />
+          <Route path="/sleep" element={<Sleep />} />
         </Routes>
         <NavBar />
       </div>

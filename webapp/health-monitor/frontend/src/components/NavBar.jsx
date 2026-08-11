@@ -4,6 +4,9 @@ const items = [
   { to: "/",        label: "Dashboard", icon: "📊" },
   { to: "/survey",  label: "Ankieta",   icon: "📝" },
   { to: "/history", label: "Historia",  icon: "📅" },
+  { to: "/sport",   label: "Sport",     icon: "🏃" },
+  { to: "/sleep",   label: "Sen",       icon: "🌙" },
+  { to: "/analysis",label: "Analiza",   icon: "📈" },
   { to: "/data",    label: "Dane",      icon: "⌚" },
 ];
 

@@ -19,4 +19,9 @@ export const api = {
   deleteSurvey: (id)       => request(`/surveys/${id}`, { method: "DELETE" }),
   getBloodPressure: ()     => request("/blood-pressure"),
   postBloodPressure: (b)   => request("/blood-pressure", { method: "POST", body: JSON.stringify(b) }),
+  getActivities: (p = {})  => request("/activities?" + new URLSearchParams(p)),
+  getSportTypes: ()        => request("/activities/sport-types"),
+  getActivitySummary: (p = {}) => request("/activities/summary?" + new URLSearchParams(p)),
+  getActivityDetails: (id)     => request(`/activities/${id}/details`),
+  getCorrelation: (p = {})     => request("/analysis/correlation?" + new URLSearchParams(p)),
 };

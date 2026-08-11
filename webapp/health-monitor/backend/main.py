@@ -4,7 +4,9 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
 import databases
+import json
 import os
+import statistics
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://health:changeme@localhost:5432/health")
 database = databases.Database(DATABASE_URL)
@@ -101,9 +103,9 @@ async def delete_survey(survey_id: int):
 @app.get("/metrics")
 async def get_metrics(
     source: Optional[str] = None,
-    days: int = Query(30, le=365)
+    days: int = Query(30, le=3650)
 ):
-    where = "WHERE date >= CURRENT_DATE - :days"
+    where = "WHERE date >= CURRENT_DATE - CAST(:days AS INTEGER)"
     params: dict = {"days": days}
     if source:
         where += " AND source = :source"
@@ -143,7 +145,7 @@ async def upsert_metrics(body: MetricsIn):
 @app.get("/blood-pressure")
 async def get_bp(days: int = Query(30, le=365)):
     rows = await database.fetch_all(
-        "SELECT * FROM blood_pressure WHERE measured_at >= NOW() - INTERVAL ':days days' ORDER BY measured_at DESC",
+        "SELECT * FROM blood_pressure WHERE measured_at >= NOW() - make_interval(days => :days) ORDER BY measured_at DESC",
         {"days": days}
     )
     return [dict(r) for r in rows]
@@ -155,6 +157,145 @@ async def create_bp(body: BloodPressureIn):
         body.model_dump()
     )
     return {"id": row_id}
+
+# ── Activities (sport) ────────────────────────────────────────────────────────
+
+@app.get("/activities")
+async def get_activities(
+    sport_type: Optional[str] = None,
+    days: Optional[int] = Query(None, le=3650),
+    limit: int = Query(200, le=2000),
+):
+    where = "WHERE 1=1"
+    params: dict = {"limit": limit}
+    if days is not None:
+        where += " AND start_time >= NOW() - make_interval(days => :days)"
+        params["days"] = days
+    if sport_type:
+        where += " AND sport_type = :sport_type"
+        params["sport_type"] = sport_type
+    rows = await database.fetch_all(
+        f"""SELECT id, garmin_activity_id, name, sport_type, start_time,
+                   duration_sec, distance_m, calories, avg_hr, max_hr,
+                   avg_speed_mps, max_speed_mps, elevation_gain_m,
+                   aerobic_te, anaerobic_te, training_load
+            FROM activities {where}
+            ORDER BY start_time DESC LIMIT :limit""",
+        params
+    )
+    return [dict(r) for r in rows]
+
+@app.get("/activities/sport-types")
+async def get_sport_types():
+    rows = await database.fetch_all(
+        "SELECT DISTINCT sport_type FROM activities ORDER BY sport_type"
+    )
+    return [r["sport_type"] for r in rows]
+
+@app.get("/activities/summary")
+async def get_activities_summary(days: Optional[int] = Query(None, le=3650)):
+    where = "WHERE 1=1"
+    params: dict = {}
+    if days is not None:
+        where += " AND start_time >= NOW() - make_interval(days => :days)"
+        params["days"] = days
+
+    by_sport = await database.fetch_all(
+        f"""SELECT sport_type,
+                   COUNT(*) AS sessions,
+                   SUM(distance_m) AS total_distance_m,
+                   SUM(duration_sec) AS total_duration_sec,
+                   SUM(calories) AS total_calories,
+                   AVG(avg_hr) AS avg_hr
+            FROM activities {where}
+            GROUP BY sport_type
+            ORDER BY total_duration_sec DESC NULLS LAST""",
+        params
+    )
+    weekly = await database.fetch_all(
+        f"""SELECT date_trunc('week', start_time)::date AS week,
+                   sport_type,
+                   SUM(distance_m) AS total_distance_m,
+                   SUM(duration_sec) AS total_duration_sec
+            FROM activities {where}
+            GROUP BY week, sport_type
+            ORDER BY week ASC""",
+        params
+    )
+    return {
+        "by_sport": [dict(r) for r in by_sport],
+        "weekly": [dict(r) for r in weekly],
+    }
+
+def _as_json(value):
+    """Kolumny JSONB wracają z asyncpg jako string — parsujemy defensywnie."""
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_splits(raw) -> list:
+    """Garmin nie dokumentuje formalnie kształtu odpowiedzi get_activity_splits —
+    próbujemy kilku znanych wariantów kluczy i defensywnie wyciągamy pola."""
+    data = _as_json(raw)
+    if data is None:
+        return []
+    laps = data.get("lapDTOs") or data.get("laps") or data.get("splits") \
+        if isinstance(data, dict) else data
+    if not isinstance(laps, list):
+        return []
+    result = []
+    for i, lap in enumerate(laps, start=1):
+        if not isinstance(lap, dict):
+            continue
+        result.append({
+            "index":            lap.get("lapIndex") or lap.get("index") or i,
+            "distance_m":       lap.get("distance"),
+            "duration_sec":     lap.get("duration") or lap.get("movingDuration"),
+            "avg_hr":           lap.get("averageHR"),
+            "max_hr":           lap.get("maxHR"),
+            "avg_speed_mps":    lap.get("averageSpeed"),
+            "elevation_gain_m": lap.get("elevationGain"),
+        })
+    return result
+
+
+def _parse_hr_zones(raw) -> list:
+    data = _as_json(raw)
+    if not isinstance(data, list):
+        return []
+    result = []
+    for zone in data:
+        if not isinstance(zone, dict):
+            continue
+        result.append({
+            "zone":    zone.get("zoneNumber") or zone.get("zone"),
+            "seconds": zone.get("secsInZone") or zone.get("seconds"),
+            "low_bpm": zone.get("zoneLowBoundary") or zone.get("lowBoundary"),
+        })
+    return result
+
+
+@app.get("/activities/{activity_id}/details")
+async def get_activity_details(activity_id: int):
+    row = await database.fetch_one(
+        "SELECT id, splits_raw, hr_zones_raw FROM activities WHERE id = :id",
+        {"id": activity_id}
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono aktywności")
+    splits = _parse_splits(row["splits_raw"])
+    hr_zones = _parse_hr_zones(row["hr_zones_raw"])
+    return {
+        "splits": splits,
+        "hr_zones": hr_zones,
+        "has_details": bool(splits or hr_zones),
+    }
 
 # ── Summary for dashboard ─────────────────────────────────────────────────────
 
@@ -179,3 +320,63 @@ async def get_summary():
         "surveys": [dict(r) for r in surveys],
         "blood_pressure": [dict(r) for r in bp],
     }
+
+# ── Analiza korelacji stresu z metrykami fizjologicznymi ───────────────────────
+
+CORRELATION_METRICS = ("hrv", "resting_hr", "sleep_score", "sleep_total_min", "spo2", "avg_stress")
+
+@app.get("/analysis/correlation")
+async def get_correlation(days: Optional[int] = Query(None, le=3650)):
+    """Zestawia dzienny stres z ankiet (VAS) z metrykami Garmina tego samego
+    dnia (HRV, tętno spoczynkowe, sen, SpO2, stres wg Garmina) i liczy
+    korelację Pearsona każdej z nich z odczuwanym stresem."""
+    where = ""
+    params: dict = {}
+    if days is not None:
+        where = "WHERE sd.date >= CURRENT_DATE - CAST(:days AS INTEGER)"
+        params["days"] = days
+
+    rows = await database.fetch_all(
+        f"""WITH survey_daily AS (
+                SELECT date, AVG(vas_stress) AS vas_stress,
+                       AVG(sam_valence) AS sam_valence, AVG(sam_arousal) AS sam_arousal
+                FROM surveys
+                WHERE vas_stress IS NOT NULL
+                GROUP BY date
+            ),
+            metrics_daily AS (
+                -- Jeśli dzień ma dane z obu opasek, preferujemy Garmina
+                -- (więcej metryk, np. HRV), w innym wypadku bierzemy Mi Band.
+                SELECT DISTINCT ON (date)
+                       date, hrv, resting_hr, sleep_score, sleep_total_min,
+                       spo2, avg_stress
+                FROM daily_metrics
+                ORDER BY date, (source = 'garmin') DESC
+            )
+            SELECT sd.date, sd.vas_stress, sd.sam_valence, sd.sam_arousal,
+                   md.hrv, md.resting_hr, md.sleep_score, md.sleep_total_min,
+                   md.spo2, md.avg_stress
+            FROM survey_daily sd
+            JOIN metrics_daily md ON md.date = sd.date
+            {where}
+            ORDER BY sd.date ASC""",
+        params
+    )
+    pairs = [dict(r) for r in rows]
+
+    correlations = {}
+    for metric in CORRELATION_METRICS:
+        xs, ys = [], []
+        for p in pairs:
+            if p["vas_stress"] is not None and p[metric] is not None:
+                xs.append(float(p["vas_stress"]))
+                ys.append(float(p[metric]))
+        r = None
+        if len(xs) >= 3 and len(set(xs)) > 1 and len(set(ys)) > 1:
+            try:
+                r = round(statistics.correlation(xs, ys), 3)
+            except statistics.StatisticsError:
+                r = None
+        correlations[metric] = {"r": r, "n": len(xs)}
+
+    return {"pairs": pairs, "correlations": correlations}

@@ -53,6 +53,8 @@ body {
   justify-content: space-around;
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
   z-index: 100;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .nav-item {
@@ -64,12 +66,14 @@ body {
   text-decoration: none;
   font-size: 0.68rem;
   font-weight: 500;
-  padding: 6px 18px;
+  padding: 6px 10px;
   border-radius: 8px;
   transition: color .15s;
   background: none;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .nav-item svg { width: 22px; height: 22px; }
 .nav-item.active { color: var(--accent); }

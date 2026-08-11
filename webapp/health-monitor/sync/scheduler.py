@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+import garmin_activities_sync
 import garmin_sync
 import miband_sync
 
@@ -34,6 +35,16 @@ async def job_garmin_daily():
     except Exception as e:
         log.error(f"Garmin sync nieudany: {e}")
     log.info("=== KONIEC: Garmin sync ===")
+
+
+async def job_activities():
+    """Sync ostatnich aktywności/treningów z Garmina."""
+    log.info("=== START: Aktywności sync ===")
+    try:
+        await garmin_activities_sync.run(limit=20)
+    except Exception as e:
+        log.error(f"Aktywności sync nieudany: {e}")
+    log.info("=== KONIEC: Aktywności sync ===")
 
 
 async def job_miband():
@@ -57,6 +68,10 @@ async def startup_sync():
         await miband_sync.run(days_back=7)
     except Exception as e:
         log.error(f"Startup Mi Band sync błąd: {e}")
+    try:
+        await garmin_activities_sync.run(limit=20)
+    except Exception as e:
+        log.error(f"Startup aktywności sync błąd: {e}")
     log.info("=== STARTUP SYNC ZAKOŃCZONY ===")
 
 
@@ -69,6 +84,15 @@ async def main():
         CronTrigger(hour=23, minute=45),
         id="garmin_daily",
         name="Garmin codzienny sync",
+        replace_existing=True,
+    )
+
+    # Aktywności Garmin — raz dziennie o 23:47
+    scheduler.add_job(
+        job_activities,
+        CronTrigger(hour=23, minute=47),
+        id="activities_daily",
+        name="Aktywności Garmin codzienny sync",
         replace_existing=True,
     )
 
