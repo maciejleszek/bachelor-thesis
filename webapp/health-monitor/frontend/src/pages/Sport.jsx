@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, Tooltip,
+  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import MetricCard from "../components/MetricCard";
 import { api } from "../api";
+
+const VOLUME_COLORS = ["var(--accent)", "var(--accent2)", "var(--warn)", "var(--danger)", "#9c8fff", "var(--muted)"];
 
 const SPORT_ICONS = {
   running: "🏃", trail_running: "🏃", treadmill_running: "🏃",
@@ -152,12 +154,19 @@ export default function Sport() {
   const [days, setDays] = useState("90");
   const [summary, setSummary] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [records, setRecords] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     api.getSportTypes().then(setSportTypes).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.getActivityRecords(sportType ? { sport_type: sportType } : {})
+      .then(setRecords)
+      .catch(() => setRecords(null));
+  }, [sportType]);
 
   useEffect(() => {
     setLoading(true);
@@ -186,7 +195,55 @@ export default function Sport() {
       .map(w => ({ week: w.week.slice(5), "Dystans (km)": +(w.distance / 1000).toFixed(1) }));
   }, [summary, sportType]);
 
+  const loadTrendData = useMemo(() => {
+    return [...activities]
+      .filter(a => a.training_load != null)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time))
+      .map(a => ({
+        date: new Date(a.start_time).toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" }),
+        "Obciążenie": Number(a.training_load),
+      }));
+  }, [activities]);
+
+  const weeklyVolume = useMemo(() => {
+    if (sportType) return { data: [], sports: [] };
+    const weekly = summary?.weekly || [];
+    const totals = {};
+    for (const w of weekly) {
+      totals[w.sport_type] = (totals[w.sport_type] || 0) + Number(w.total_duration_sec || 0);
+    }
+    const topSports = Object.entries(totals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([s]) => s);
+
+    const weekMap = {};
+    for (const w of weekly) {
+      const key = w.week;
+      if (!weekMap[key]) weekMap[key] = { week: key };
+      const label = topSports.includes(w.sport_type) ? sportLabel(w.sport_type) : "inne";
+      const hours = Number(w.total_duration_sec || 0) / 3600;
+      weekMap[key][label] = +((weekMap[key][label] || 0) + hours).toFixed(2);
+    }
+    const sportsPresent = new Set();
+    Object.values(weekMap).forEach(w => Object.keys(w).forEach(k => { if (k !== "week") sportsPresent.add(k); }));
+
+    return {
+      data: Object.values(weekMap)
+        .sort((a, b) => a.week.localeCompare(b.week))
+        .map(w => ({ ...w, week: w.week.slice(5) })),
+      sports: Array.from(sportsPresent),
+    };
+  }, [summary, sportType]);
+
   const bySport = summary?.by_sport || [];
+
+  const RECORD_LABELS = {
+    distance_m:    { icon: "📏", label: "Najdłuższy dystans", format: r => formatDistance(r.value) },
+    duration_sec:  { icon: "⏱",  label: "Najdłuższy trening", format: r => formatDuration(r.value) },
+    calories:      { icon: "🔥", label: "Najwięcej kalorii",  format: r => `${Math.round(r.value)} kcal` },
+    avg_speed_mps: { icon: "⚡", label: "Najszybsze tempo",   format: r => formatPace(r.value) },
+  };
 
   const selectStyle = {
     background: "var(--surface2)", border: "1px solid var(--border)",
@@ -237,6 +294,31 @@ export default function Sport() {
               ))}
           </div>
 
+          {records && Object.values(records.records).some(Boolean) && (
+            <div className="card" style={{ marginBottom: "var(--gap)" }}>
+              <div className="card-title">
+                Rekordy życiowe {sportType ? `— ${sportLabel(sportType)}` : "(wszystkie dyscypliny)"}
+              </div>
+              <div className="metric-grid" style={{ marginBottom: 0 }}>
+                {Object.entries(RECORD_LABELS).map(([key, cfg]) => {
+                  const r = records.records[key];
+                  if (!r) return null;
+                  return (
+                    <MetricCard
+                      key={key}
+                      icon={cfg.icon}
+                      label={cfg.label}
+                      color="var(--warn)"
+                      value={cfg.format(r)}
+                      unit=""
+                      sub={`${r.name || sportLabel(r.sport_type)} · ${new Date(r.start_time).toLocaleDateString("pl-PL")}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {chartData.length > 0 && (
             <div className="chart-wrap">
               <div className="card-title">
@@ -251,6 +333,46 @@ export default function Sport() {
                   <Line type="monotone" dataKey="Dystans (km)" stroke="var(--accent)"
                     strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {loadTrendData.length > 0 && (
+            <div className="chart-wrap">
+              <div className="card-title">
+                Obciążenie treningowe — trend ({sportType ? sportLabel(sportType) : "wszystkie dyscypliny"})
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={loadTrendData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="date" tick={{ fill: "var(--muted)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "var(--muted)", fontSize: 11 }} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="Obciążenie" stroke="var(--danger)"
+                    strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="form-hint">
+                Training load wg Garmina/Mi Banda — im wyżej, tym większy wysiłek fizjologiczny treningu.
+              </div>
+            </div>
+          )}
+
+          {weeklyVolume.data.length > 0 && (
+            <div className="chart-wrap">
+              <div className="card-title">Objętość treningowa tygodniowo (godziny, wg dyscypliny)</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={weeklyVolume.data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="week" tick={{ fill: "var(--muted)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "var(--muted)", fontSize: 11 }} unit="h" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted)" }} />
+                  {weeklyVolume.sports.map((s, i) => (
+                    <Bar key={s} dataKey={s} stackId="vol" fill={VOLUME_COLORS[i % VOLUME_COLORS.length]}
+                      radius={i === weeklyVolume.sports.length - 1 ? [3, 3, 0, 0] : undefined} />
+                  ))}
+                </BarChart>
               </ResponsiveContainer>
             </div>
           )}

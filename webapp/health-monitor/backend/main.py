@@ -227,6 +227,38 @@ async def get_activities_summary(days: Optional[int] = Query(None, le=3650)):
         "weekly": [dict(r) for r in weekly],
     }
 
+RECORD_METRICS = {
+    "distance_m":    "distance_m",
+    "duration_sec":  "duration_sec",
+    "calories":      "calories",
+    "avg_speed_mps": "avg_speed_mps",
+}
+
+@app.get("/activities/records")
+async def get_activity_records(sport_type: Optional[str] = None):
+    """Rekordy życiowe (całą historię, niezależnie od filtra dni) —
+    najdłuższy dystans, najdłuższy czas, najwięcej kalorii, najszybsze tempo."""
+    where = "WHERE 1=1"
+    params: dict = {}
+    if sport_type:
+        where += " AND sport_type = :sport_type"
+        params["sport_type"] = sport_type
+
+    records = {}
+    for key, column in RECORD_METRICS.items():
+        row = await database.fetch_one(
+            f"""SELECT id, name, sport_type, start_time, {column} AS value
+                FROM activities {where} AND {column} IS NOT NULL AND {column} > 0
+                ORDER BY {column} DESC LIMIT 1""",
+            params
+        )
+        records[key] = dict(row) if row else None
+
+    total = await database.fetch_one(
+        f"SELECT COUNT(*) AS n FROM activities {where}", params
+    )
+    return {"records": records, "total_activities": total["n"]}
+
 def _as_json(value):
     """Kolumny JSONB wracają z asyncpg jako string — parsujemy defensywnie."""
     if value is None:
@@ -370,6 +402,72 @@ async def get_correlation(days: Optional[int] = Query(None, le=3650)):
         for p in pairs:
             if p["vas_stress"] is not None and p[metric] is not None:
                 xs.append(float(p["vas_stress"]))
+                ys.append(float(p[metric]))
+        r = None
+        if len(xs) >= 3 and len(set(xs)) > 1 and len(set(ys)) > 1:
+            try:
+                r = round(statistics.correlation(xs, ys), 3)
+            except statistics.StatisticsError:
+                r = None
+        correlations[metric] = {"r": r, "n": len(xs)}
+
+    return {"pairs": pairs, "correlations": correlations}
+
+# ── Trening a regeneracja następnego dnia ───────────────────────────────────────
+
+RECOVERY_METRICS = ("next_sleep_score", "next_resting_hr", "next_hrv", "next_vas_stress")
+
+@app.get("/analysis/training-recovery")
+async def get_training_recovery(days: Optional[int] = Query(None, le=3650)):
+    """Zestawia dzienne obciążenie treningowe (suma training_load z aktywności
+    danego dnia) z metrykami regeneracji NASTĘPNEGO dnia — sleep score, tętno
+    spoczynkowe, HRV, subiektywny stres z ankiety — i liczy korelację Pearsona."""
+    where = ""
+    params: dict = {}
+    if days is not None:
+        where = "WHERE dt.date >= CURRENT_DATE - CAST(:days AS INTEGER)"
+        params["days"] = days
+
+    rows = await database.fetch_all(
+        f"""WITH daily_training AS (
+                SELECT start_time::date AS date,
+                       SUM(training_load) AS training_load,
+                       COUNT(*) AS sessions
+                FROM activities
+                GROUP BY date
+            ),
+            metrics_daily AS (
+                SELECT DISTINCT ON (date)
+                       date, sleep_score, resting_hr, hrv
+                FROM daily_metrics
+                ORDER BY date, (source = 'garmin') DESC
+            ),
+            survey_daily AS (
+                SELECT date, AVG(vas_stress) AS vas_stress
+                FROM surveys
+                WHERE vas_stress IS NOT NULL
+                GROUP BY date
+            )
+            SELECT dt.date AS training_date, dt.training_load, dt.sessions,
+                   md.sleep_score AS next_sleep_score,
+                   md.resting_hr AS next_resting_hr,
+                   md.hrv AS next_hrv,
+                   sv.vas_stress AS next_vas_stress
+            FROM daily_training dt
+            LEFT JOIN metrics_daily md ON md.date = dt.date + 1
+            LEFT JOIN survey_daily sv ON sv.date = dt.date + 1
+            {where}
+            ORDER BY dt.date ASC""",
+        params
+    )
+    pairs = [dict(r) for r in rows]
+
+    correlations = {}
+    for metric in RECOVERY_METRICS:
+        xs, ys = [], []
+        for p in pairs:
+            if p["training_load"] is not None and p[metric] is not None:
+                xs.append(float(p["training_load"]))
                 ys.append(float(p[metric]))
         r = None
         if len(xs) >= 3 and len(set(xs)) > 1 and len(set(ys)) > 1:

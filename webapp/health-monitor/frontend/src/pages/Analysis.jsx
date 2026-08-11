@@ -16,6 +16,15 @@ const METRICS = [
 const metricLabel = (key) => METRICS.find(m => m.key === key)?.label || key;
 const metricUnit = (key) => METRICS.find(m => m.key === key)?.unit || "";
 
+const RECOVERY_METRICS = [
+  { key: "next_vas_stress",  label: "Stres nast. dnia (ankieta)", unit: "/100" },
+  { key: "next_sleep_score", label: "Sleep score nast. nocy",     unit: "/100" },
+  { key: "next_resting_hr",  label: "Tętno spocz. nast. dnia",    unit: "bpm" },
+  { key: "next_hrv",         label: "HRV nast. dnia",             unit: "ms" },
+];
+const recoveryLabel = (key) => RECOVERY_METRICS.find(m => m.key === key)?.label || key;
+const recoveryUnit = (key) => RECOVERY_METRICS.find(m => m.key === key)?.unit || "";
+
 const DAYS_OPTIONS = [
   { label: "90 dni", value: "90" },
   { label: "365 dni", value: "365" },
@@ -65,6 +74,8 @@ export default function Analysis() {
   const [metric, setMetric] = useState("hrv");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [recoveryMetric, setRecoveryMetric] = useState("next_vas_stress");
+  const [recovery, setRecovery] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -72,6 +83,9 @@ export default function Analysis() {
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
+    api.getTrainingRecovery(days ? { days } : {})
+      .then(setRecovery)
+      .catch(() => {});
   }, [days]);
 
   const scatterData = useMemo(() => {
@@ -102,6 +116,27 @@ export default function Analysis() {
         [metricLabel(metric)]: p[metric] != null ? Number(p[metric]) : null,
       }));
   }, [data, metric]);
+
+  const recoveryScatter = useMemo(() => {
+    if (!recovery) return [];
+    return recovery.pairs
+      .filter(p => p.training_load != null && p[recoveryMetric] != null)
+      .map(p => ({ x: Number(p.training_load), y: Number(p[recoveryMetric]) }));
+  }, [recovery, recoveryMetric]);
+
+  const recoveryTrend = useMemo(() => linearRegression(recoveryScatter), [recoveryScatter]);
+  const recoveryTrendLine = useMemo(() => {
+    if (!recoveryTrend || recoveryScatter.length === 0) return [];
+    const xs = recoveryScatter.map(p => p.x);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    return [
+      { x: minX, y: +(recoveryTrend.slope * minX + recoveryTrend.intercept).toFixed(2) },
+      { x: maxX, y: +(recoveryTrend.slope * maxX + recoveryTrend.intercept).toFixed(2) },
+    ];
+  }, [recoveryTrend, recoveryScatter]);
+
+  const recoveryCorrelations = recovery?.correlations || {};
+  const hasRecoveryData = Object.values(recoveryCorrelations).some(c => c.n >= 3);
 
   const selectStyle = {
     background: "var(--surface2)", border: "1px solid var(--border)",
@@ -203,6 +238,77 @@ export default function Analysis() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          )}
+
+          <div className="page-title" style={{ fontSize: "1.1rem", marginTop: 28 }}>Trening a regeneracja</div>
+          <div className="form-hint" style={{ marginBottom: 12 }}>
+            Czy dzienne obciążenie treningowe (suma training load z aktywności) wiąże się
+            z regeneracją następnego dnia?
+          </div>
+
+          {!hasRecoveryData ? (
+            <div className="empty">
+              Za mało dni z treningiem i danymi z dnia następnego, żeby policzyć korelację.
+            </div>
+          ) : (
+            <>
+              <div className="card" style={{ marginBottom: "var(--gap)" }}>
+                <div className="card-title">Korelacja obciążenia treningowego z regeneracją</div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ color: "var(--muted)", textAlign: "left" }}>
+                      <th style={{ padding: "4px 8px 4px 0" }}>Metryka (dzień +1)</th>
+                      <th style={{ padding: "4px 8px" }}>r</th>
+                      <th style={{ padding: "4px 8px" }}>n</th>
+                      <th style={{ padding: "4px 8px" }}>Interpretacja</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {RECOVERY_METRICS.map(m => {
+                      const c = recoveryCorrelations[m.key] || { r: null, n: 0 };
+                      const info = interpretR(c.r);
+                      return (
+                        <tr key={m.key} style={{ borderTop: "1px solid var(--border)" }}>
+                          <td style={{ padding: "6px 8px 6px 0" }}>{m.label}</td>
+                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{c.r ?? "—"}</td>
+                          <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{c.n}</td>
+                          <td style={{ padding: "6px 8px", color: info.color }}>{info.label}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <select style={{ ...selectStyle, width: "100%", marginBottom: 12 }}
+                value={recoveryMetric} onChange={e => setRecoveryMetric(e.target.value)}>
+                {RECOVERY_METRICS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+              </select>
+
+              {recoveryScatter.length > 0 && (
+                <div className="chart-wrap">
+                  <div className="card-title">Obciążenie treningowe vs {recoveryLabel(recoveryMetric)}</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart margin={{ top: 4, right: 4, bottom: 4, left: -20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="x" type="number" name="Obciążenie"
+                        tick={{ fill: "var(--muted)", fontSize: 11 }} />
+                      <YAxis dataKey="y" type="number" name={recoveryLabel(recoveryMetric)}
+                        tick={{ fill: "var(--muted)", fontSize: 11 }} unit={recoveryUnit(recoveryMetric)} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: "3 3" }} />
+                      <Scatter data={recoveryScatter} fill="var(--danger)" />
+                      {recoveryTrendLine.length === 2 && (
+                        <Line data={recoveryTrendLine} dataKey="y" stroke="var(--accent)"
+                          strokeWidth={2} dot={false} legendType="none" isAnimationActive={false} />
+                      )}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                  <div className="form-hint">
+                    Oś X: training load dnia treningowego · Oś Y: {recoveryLabel(recoveryMetric)} dnia następnego
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
