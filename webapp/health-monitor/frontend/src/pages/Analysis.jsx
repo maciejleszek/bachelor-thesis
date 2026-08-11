@@ -25,6 +25,55 @@ const RECOVERY_METRICS = [
 const recoveryLabel = (key) => RECOVERY_METRICS.find(m => m.key === key)?.label || key;
 const recoveryUnit = (key) => RECOVERY_METRICS.find(m => m.key === key)?.unit || "";
 
+// Oczekiwany fizjologicznie kierunek korelacji per metryka — używane do
+// oznaczenia, czy wynik jest zgodny z hipotezą, czy zaskakujący.
+// expectedSign: 1 = dodatnia, -1 = ujemna, 0 = brak jednoznacznych oczekiwań.
+const STRESS_EXPECTATIONS = {
+  hrv:             { expectedSign: -1, note: "wyższy stres zwykle obniża zmienność rytmu serca (HRV)" },
+  resting_hr:      { expectedSign: 1,  note: "wyższy stres zwykle podnosi tętno spoczynkowe" },
+  sleep_score:     { expectedSign: -1, note: "wyższy stres zwykle pogarsza jakość snu" },
+  sleep_total_min: { expectedSign: -1, note: "wyższy stres zwykle skraca czas snu" },
+  spo2:            { expectedSign: 0,  note: "SpO₂ zwykle nie ma silnego, jednoznacznego związku ze stresem" },
+  avg_stress:      { expectedSign: 1,  note: "algorytm stresu urządzenia powinien rosnąć razem z odczuwanym stresem" },
+};
+
+const RECOVERY_EXPECTATIONS = {
+  next_sleep_score: { expectedSign: 0,  note: "trening może poprawiać sen (zmęczenie) albo go pogarszać (zbyt intensywny wieczorem) — kierunek zależy od kontekstu" },
+  next_resting_hr:  { expectedSign: 0,  note: "krótkoterminowo trening podnosi obciążenie organizmu, długoterminowo poprawia kondycję — efekt netto zależy od okresu obserwacji" },
+  next_hrv:         { expectedSign: -1, note: "intensywny trening zwykle chwilowo obniża HRV jako oznakę obciążenia do zregenerowania" },
+  next_vas_stress:  { expectedSign: -1, note: "aktywność fizyczna często obniża odczuwany stres (efekt endorfin, odreagowanie)" },
+};
+
+function strengthLabel(r) {
+  const abs = Math.abs(r);
+  return abs < 0.1 ? "brak" : abs < 0.3 ? "słaba" : abs < 0.5 ? "umiarkowana" : abs < 0.7 ? "silna" : "bardzo silna";
+}
+
+/** Buduje listę zdań-wniosków posortowaną wg siły korelacji (|r| malejąco). */
+function buildInsights(correlations, metricsList, expectations, labelFn, minN = 5) {
+  const scored = metricsList
+    .map(m => ({ ...m, c: correlations[m.key] }))
+    .filter(m => m.c && m.c.r != null && m.c.n >= minN)
+    .sort((a, b) => Math.abs(b.c.r) - Math.abs(a.c.r));
+
+  return scored.map(({ key, label, c }) => {
+    const strength = strengthLabel(c.r);
+    const exp = expectations[key] || { expectedSign: 0 };
+    if (strength === "brak") {
+      return `${label}: brak zauważalnego związku (r=${c.r}, n=${c.n}).`;
+    }
+    const direction = c.r > 0 ? "dodatnia" : "ujemna";
+    let note = "";
+    if (exp.expectedSign !== 0) {
+      const matches = Math.sign(c.r) === exp.expectedSign;
+      note = matches
+        ? ` Zgodne z oczekiwaniami: ${exp.note}.`
+        : ` To zaskakujący kierunek — fizjologicznie oczekiwano raczej, że ${exp.note}, a zaobserwowano odwrotną zależność.`;
+    }
+    return `${label}: korelacja ${strength} ${direction} (r=${c.r}, n=${c.n}).${note}`;
+  });
+}
+
 const DAYS_OPTIONS = [
   { label: "90 dni", value: "90" },
   { label: "365 dni", value: "365" },
@@ -135,8 +184,19 @@ export default function Analysis() {
     ];
   }, [recoveryTrend, recoveryScatter]);
 
+  const correlations = data?.correlations || {};
+  const hasEnoughData = Object.values(correlations).some(c => c.n >= 3);
   const recoveryCorrelations = recovery?.correlations || {};
   const hasRecoveryData = Object.values(recoveryCorrelations).some(c => c.n >= 3);
+
+  const stressInsights = useMemo(
+    () => buildInsights(correlations, METRICS, STRESS_EXPECTATIONS, metricLabel),
+    [correlations]
+  );
+  const recoveryInsights = useMemo(
+    () => buildInsights(recoveryCorrelations, RECOVERY_METRICS, RECOVERY_EXPECTATIONS, recoveryLabel),
+    [recoveryCorrelations]
+  );
 
   const selectStyle = {
     background: "var(--surface2)", border: "1px solid var(--border)",
@@ -145,9 +205,6 @@ export default function Analysis() {
   };
 
   if (loading && !data) return <div className="empty">Ładowanie…</div>;
-
-  const correlations = data?.correlations || {};
-  const hasEnoughData = Object.values(correlations).some(c => c.n >= 3);
 
   return (
     <div className="page">
@@ -197,6 +254,22 @@ export default function Analysis() {
               </tbody>
             </table>
           </div>
+
+          {stressInsights.length > 0 && (
+            <div className="card" style={{ marginBottom: "var(--gap)" }}>
+              <div className="card-title">Wnioski</div>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+                {stressInsights.map((text, i) => (
+                  <li key={i} style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>{text}</li>
+                ))}
+              </ul>
+              <div className="form-hint" style={{ marginTop: 10 }}>
+                Uwaga: to korelacja, nie przyczynowość — przy niewielkiej liczbie
+                sparowanych dni (n) wyniki mogą się zmieniać wraz z napływem
+                kolejnych ankiet i danych z opasek.
+              </div>
+            </div>
+          )}
 
           {scatterData.length > 0 && (
             <div className="chart-wrap">
@@ -279,6 +352,17 @@ export default function Analysis() {
                   </tbody>
                 </table>
               </div>
+
+              {recoveryInsights.length > 0 && (
+                <div className="card" style={{ marginBottom: "var(--gap)" }}>
+                  <div className="card-title">Wnioski</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {recoveryInsights.map((text, i) => (
+                      <li key={i} style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>{text}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <select style={{ ...selectStyle, width: "100%", marginBottom: 12 }}
                 value={recoveryMetric} onChange={e => setRecoveryMetric(e.target.value)}>
