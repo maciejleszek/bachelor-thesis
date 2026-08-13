@@ -1,4 +1,4 @@
-# Health Monitor — mobile (Expo / React Native)
+# Health Monitor — mobile (Flutter)
 
 Mobilny klient dla tego samego backendu FastAPI co `frontend/` (web). Ekrany
 1:1 do stron webowych: Dashboard, Sen, Sport, Analiza, Ankieta, plus
@@ -9,131 +9,83 @@ trzeba go podać jawnie).
 
 ```
 mobile/
-  App.tsx                    ← providerzy: React Query, Navigation, SafeArea
-  src/
-    api/client.ts             ← fetch wrapper + adres API (env + AsyncStorage override)
-    api/endpoints.ts          ← port frontend/src/api.js
-    api/types.ts               ← typy odpowiedzi backendu
-    navigation/RootNavigator.tsx
-    screens/                   ← Dashboard, Sleep, Sport, Analysis, Survey, Settings
-    components/                ← MetricCard, Screen/Card/EmptyState
-    theme/colors.ts
+  lib/
+    main.dart                  ← MaterialApp, ciemny motyw
+    api/client.dart             ← http wrapper + adres API (--dart-define + SharedPreferences override)
+    api/endpoints.dart          ← port frontend/src/api.js
+    api/types.dart              ← modele odpowiedzi backendu
+    navigation/root_navigator.dart ← BottomNavigationBar (IndexedStack)
+    screens/                    ← Dashboard, Sleep, Sport, Analysis, Survey, Settings
+    widgets/                    ← Screen/AppCard/EmptyState, MetricCard
+    theme/colors.dart
+  assets/                       ← ikony aplikacji (do podpięcia w flutter_launcher_icons)
+  pubspec.yaml
 ```
+
+## Wymagania
+
+Ten katalog zawiera tylko kod Dart (`lib/`, `pubspec.yaml`) — **foldery
+platformowe `android/` i `ios/` nie są w repo** (analogicznie jak wcześniej
+przy Expo managed workflow) i trzeba je wygenerować lokalnie po instalacji
+Flutter SDK:
+
+1. Zainstaluj [Flutter SDK](https://docs.flutter.dev/get-started/install)
+   (kanał `stable`) i sprawdź `flutter doctor`.
+2. W katalogu `mobile/`:
+   ```
+   flutter create --platforms=android,ios --org pl.dekk --project-name health_monitor .
+   ```
+   To dogeneruje `android/` i `ios/` obok istniejącego `lib/`/`pubspec.yaml`
+   (istniejące pliki nie zostaną nadpisane).
+3. `flutter pub get`
 
 ## Uruchomienie lokalnie
 
-1. `cd mobile && npm install` (już zrobione).
-2. Uruchom backend: `docker compose up` w katalogu głównym `health-monitor/`
+1. Uruchom backend: `docker compose up` w katalogu głównym `health-monitor/`
    (nginx wystawia całość na `http://localhost/api`).
-3. Ustaw adres API w `mobile/.env` (skopiowane z `.env.example`):
-   - Symulator iOS / uruchamiasz Expo na tym samym komputerze co Docker: `http://localhost/api`.
+2. Domyślny adres API to `http://localhost/api` (patrz `lib/api/client.dart`
+   → `defaultApiUrl`). Żeby go zmienić na stałe w buildzie:
+   ```
+   flutter run --dart-define=API_URL=http://192.168.1.10/api
+   ```
+   - Emulator Androida: `http://10.0.2.2/api`.
+   - Symulator iOS na tym samym komputerze co Docker: `http://localhost/api`.
    - Fizyczny telefon w tej samej sieci Wi-Fi: `http://<IP-LAN-komputera>/api`
      (np. `ipconfig` → adres IPv4 karty Wi-Fi).
-   - Emulator Androida: `http://10.0.2.2/api`.
-4. `npx expo start` — zeskanuj kod QR aplikacją **Expo Go** (Android/iOS) albo
-   wciśnij `a` / `i` dla emulatora/symulatora.
-5. Adres API można też zmienić w aplikacji bez rebuildu — zakładka
-   **Ustawienia** zapisuje go w `AsyncStorage` i nadpisuje wartość z `.env`.
+3. `flutter run` — wybierz podłączone urządzenie/emulator.
+4. Adres API można też zmienić w aplikacji bez rebuildu — zakładka
+   **Ustawienia** zapisuje go przez `shared_preferences` i nadpisuje wartość
+   domyślną.
 
 Uwaga: backend nie ma autoryzacji i `nginx` domyślnie nasłuchuje tylko na
 `localhost`/LAN — upewnij się, że firewall na komputerze z Dockerem
 przepuszcza port 80 w sieci lokalnej, jeśli testujesz z fizycznego telefonu.
 
-## Wdrożenie do App Store (iOS)
+## Ikony aplikacji
 
-Do publikacji w App Store **potrzebny jest komputer Mac tylko do rzeczy
-opcjonalnych** — samą kompilację i wysyłkę da się zrobić z Windows dzięki
-**EAS Build** (chmura Expo kompiluje `.ipa` za ciebie). Wymagane jest za to
-płatne konto **Apple Developer Program** (99 USD/rok) — bez niego nie da się
-opublikować aplikacji (można za to testować lokalnie przez Expo Go bez
-konta).
+`assets/` zawiera PNG-i przeniesione z poprzedniej wersji Expo (`icon.png`,
+`splash-icon.png`, `android-icon-*.png`). Po `flutter create` podłącz je przez
+pakiet [`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons)
+zamiast ręcznie kopiować do `android/`/`ios/`.
 
-### 1. Konto i identyfikatory
-1. Załóż/zaloguj się na [Apple Developer](https://developer.apple.com) i
-   wykup członkostwo Apple Developer Program.
-2. Zdecyduj o unikalnym Bundle Identifier, np. `pl.dekk.healthmonitor`
-   (już ustawiony w `app.json` → `ios.bundleIdentifier` — możesz zmienić na
-   swój, jeśli `pl.dekk.healthmonitor` jest zajęty).
-3. Zainstaluj EAS CLI i zaloguj się do konta Expo:
-   ```
-   npm install -g eas-cli
-   eas login
-   ```
+## Wdrożenie do sklepów
 
-### 2. Konfiguracja builda
-1. W katalogu `mobile/`:
-   ```
-   eas build:configure
-   ```
-   Tworzy `eas.json` z profilami `development` / `preview` / `production`.
-2. Wpisz produkcyjny adres backendu (musi być publicznie dostępny przez
-   HTTPS, nie `localhost`!) jako zmienną środowiskową builda, np. w
-   `eas.json` → profil `production`:
-   ```json
-   "production": {
-     "env": { "EXPO_PUBLIC_API_URL": "https://twoja-domena.pl/api" }
-   }
-   ```
-   (Zanim wyślesz apkę do App Store, backend musi wisieć pod publicznym,
-   HTTPS-owym adresem — Apple odrzuci/ostrzeże aplikację próbującą łączyć się
-   z `http://` bez wyjątku ATS, a domowy komputer z Dockerem nie jest
-   dostępny z internetu bez dodatkowej konfiguracji, np. reverse proxy +
-   certyfikat, VPS, albo Cloudflare Tunnel).
-
-### 3. Build
+### Android
 ```
-eas build --platform ios --profile production
+flutter build appbundle --release --dart-define=API_URL=https://twoja-domena.pl/api
 ```
-- Pierwsze uruchomienie zapyta o dane do Apple ID i pozwoli EAS samo
-  wygenerować certyfikaty podpisujące i profil provisioning (zalecane —
-  EAS zarządza tym za ciebie, nie trzeba Xcode).
-- Build trwa w chmurze Expo (kilka–kilkanaście minut), na koniec dostajesz
-  link do pobrania `.ipa` oraz numer builda w EAS.
+Wynikowy `.aab` wgrywasz w [Google Play Console](https://play.google.com/console)
+(jednorazowa opłata 25 USD za konto dewelopera). Wymaga podpisania kluczem —
+patrz [Flutter docs: sign the app](https://docs.flutter.dev/deployment/android#signing-the-app).
 
-### 4. Wysyłka do App Store Connect
+### iOS
 ```
-eas submit --platform ios --latest
+flutter build ipa --release --dart-define=API_URL=https://twoja-domena.pl/api
 ```
-- Wymaga wcześniejszego utworzenia aplikacji w
-  [App Store Connect](https://appstoreconnect.apple.com) (nazwa, bundle ID,
-  SKU) — EAS submit może też zapytać i założyć wpis automatycznie przy
-  pierwszym uruchomieniu.
-- Po wysyłce apka trafia do przetwarzania (App Store Connect → TestFlight),
-  zwykle kilka-kilkanaście minut do godziny.
-
-### 5. TestFlight (testy przed publikacją)
-- W App Store Connect → zakładka **TestFlight** dodaj się jako tester
-  wewnętrzny (Internal Testing) — apka pojawi się w appce TestFlight na
-  telefonie bez czekania na review Apple.
-- To dobry moment na przetestowanie połączenia z produkcyjnym backendem.
-
-### 6. Publikacja (App Store review)
-1. W App Store Connect uzupełnij kartę aplikacji: opis, zrzuty ekranu
-   (wymagane dla kilku rozmiarów ekranu), ikonę, kategorię, politykę
-   prywatności (URL — wymagane nawet dla apki bez logowania, bo zbiera dane
-   zdrowotne), odpowiedzi na pytania o **App Privacy** (jakie dane zbiera:
-   tu dane zdrowotne z Garmin/Mi Band).
-2. Podepnij zbudowany build (z kroku 3) do wersji aplikacji.
-3. Wyślij do review (**Submit for Review**). Apple review trwa zwykle
-   1–3 dni; kategoria "zdrowie" bywa dokładniej sprawdzana (mogą dopytać, do
-   czego służą dane zdrowotne i czy jest polityka prywatności).
-4. Po akceptacji — publikacja ręczna albo automatyczna (do wyboru w
-   ustawieniach wersji).
-
-### Kolejne wydania
-Każda zmiana kodu → podbij `version`/`ios.buildNumber` w `app.json` (albo
-włącz `"appVersionSource": "remote"` w `eas.json`, żeby EAS zarządzał numerem
-builda automatycznie) → `eas build --platform ios --profile production` →
-`eas submit --platform ios --latest`.
-
-## Android (opcjonalnie, znacznie prostsze i tańsze)
-
-Ten sam kod działa też na Androida bez zmian:
-```
-eas build --platform android --profile production
-eas submit --platform android --latest
-```
-Konto Google Play Console to jednorazowa opłata 25 USD (vs. roczna
-subskrypcja Apple). Warto zacząć testy właśnie tu — proces review jest
-szybszy i mniej rygorystyczny niż w App Store, dobre miejsce, żeby
-sprawdzić cały pipeline EAS build/submit zanim zajmiesz się iOS.
+Do publikacji w App Store potrzebny jest **komputer Mac** (Xcode) oraz płatne
+konto **Apple Developer Program** (99 USD/rok) — w odróżnieniu od EAS Build
+(Expo) nie ma tu darmowej chmurowej kompilacji `.ipa` z Windows. Zanim wyślesz
+apkę, backend musi wisieć pod publicznym, HTTPS-owym adresem (Apple
+odrzuci/ostrzeże aplikację łączącą się z `http://` bez wyjątku ATS).
+Wysyłka: `flutter build ipa` → Xcode Organizer albo `xcrun altool`/
+`fastlane` do App Store Connect → TestFlight → review.

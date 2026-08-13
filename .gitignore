@@ -23,6 +23,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!webapp/health-monitor/mobile/lib/
 lib64/
 parts/
 sdist/

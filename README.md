@@ -23,13 +23,13 @@ device-reported stress, activity). The project explored two hardware approaches 
   surveys, plus manual blood-pressure entries,
 - computes Pearson correlations between VAS stress and each physiological metric (HRV, resting HR, sleep score/
   duration, SpO2, device stress), and a training-load vs. next-day-recovery analysis,
-- presents everything on a **React** web dashboard and an equivalent **React Native (Expo)** mobile app, both
+- presents everything on a **React** web dashboard and an equivalent **Flutter** mobile app, both
   talking to the same **FastAPI** REST backend.
 
 ```
 Garmin Connect API ─┐
                      ├─► sync (Python/APScheduler) ─► PostgreSQL ─► FastAPI ─┬─► React (web)
-Mi Fitness (export) ─┘                                                      └─► React Native (mobile)
+Mi Fitness (export) ─┘                                                      └─► Flutter (mobile)
 ```
 
 Everything runs behind `nginx` via `docker compose up -d --build` — see
@@ -42,7 +42,7 @@ publishing the mobile client. A full write-up of the architecture and data model
 
 | Path | What it is |
 |---|---|
-| `webapp/health-monitor/` | **The app** — FastAPI backend, Postgres, sync jobs, React web frontend, React Native mobile client, nginx |
+| `webapp/health-monitor/` | **The app** — FastAPI backend, Postgres, sync jobs, React web frontend, Flutter mobile client, nginx |
 | `test-notebooks/` | Exploratory notebooks: Garmin API trials, Mi Band CSV parsing (HR/sleep/SpO2/steps/stress), SAM/VAS + weight data, merging everything into one dataframe |
 | `heat_map/`, `regression/` | Early correlation-heatmap and regression experiments on the merged dataset, precursors to `/analysis/*` in the backend |
 | `sleep_plots/` | Generated plots from early sleep-metric analysis (HRV vs. sleep score, stage breakdowns, etc.) |
@@ -54,6 +54,6 @@ publishing the mobile client. A full write-up of the architecture and data model
 - **Backend**: Python, FastAPI, `asyncpg`/`databases`, APScheduler, `garminconnect`
 - **Data**: PostgreSQL; Pandas, NumPy, scikit-learn, seaborn/matplotlib for the exploratory analysis
 - **Frontend**: React (Create React App), Recharts
-- **Mobile**: React Native, Expo, React Navigation, TanStack Query
+- **Mobile**: Flutter, Dart
 - **Infra**: Docker / Docker Compose, nginx
 - **Data formats**: JSON, XML, CSV (Garmin/Mi Band export & import formats)

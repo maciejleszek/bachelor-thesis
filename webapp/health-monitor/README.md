@@ -73,6 +73,6 @@ importowany ponownie.
 
 - `backend/` — FastAPI + SQL (`init.sql`), API na porcie 8000
 - `frontend/` — React (CRA), dev server na porcie 3000
-- `mobile/` — klient mobilny (React Native / Expo) na ten sam backend, zobacz [mobile/README.md](mobile/README.md)
+- `mobile/` — klient mobilny (Flutter) na ten sam backend, zobacz [mobile/README.md](mobile/README.md)
 - `sync/` — pobieranie danych z Garmin/Mi Band do Postgresa
 - `nginx/` — reverse proxy, jedyny publiczny port (80): `/` → frontend, `/api/` → backend
