@@ -35,7 +35,10 @@ Mi Fitness (export) ─┘                                                      
 Everything runs behind `nginx` via `docker compose up -d --build` — see
 [webapp/health-monitor/README.md](webapp/health-monitor/README.md) for setup, the Garmin/Mi Band sync/backfill
 workflow, and [webapp/health-monitor/mobile/README.md](webapp/health-monitor/mobile/README.md) for running and
-publishing the mobile client. A full write-up of the architecture and data model (for the thesis itself) is in
+publishing the mobile client. Full technical documentation (architecture, data model, API reference, frontend,
+mobile, sync, infra) is in
+[webapp/health-monitor/docs/dokumentacja_techniczna.md](webapp/health-monitor/docs/dokumentacja_techniczna.md)
+(Polish); a narrative write-up for the thesis itself (methodology, correlation results, implementation issues) is in
 [webapp/health-monitor/docs/raport_aplikacja_health_monitor.md](webapp/health-monitor/docs/raport_aplikacja_health_monitor.md).
 
 ## Repository map
@@ -54,6 +57,6 @@ publishing the mobile client. A full write-up of the architecture and data model
 - **Backend**: Python, FastAPI, `asyncpg`/`databases`, APScheduler, `garminconnect`
 - **Data**: PostgreSQL; Pandas, NumPy, scikit-learn, seaborn/matplotlib for the exploratory analysis
 - **Frontend**: React (Create React App), Recharts
-- **Mobile**: Flutter, Dart
+- **Mobile**: Flutter, Dart, `fl_chart`, `http`, `shared_preferences`
 - **Infra**: Docker / Docker Compose, nginx
 - **Data formats**: JSON, XML, CSV (Garmin/Mi Band export & import formats)

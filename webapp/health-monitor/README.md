@@ -69,6 +69,29 @@ Wyeksportuj dane ze strony [account.xiaomi.com](https://account.xiaomi.com)
 zaimportuje (skanowanie co 2h + o 23:50). Raz przetworzony plik nie jest
 importowany ponownie.
 
+## Aplikacja mobilna (Flutter)
+
+`mobile/` to natywny klient (Android/iOS) w Flutterze/Dart, 1:1 do stron
+webowych: Dashboard, Sen, Sport, Analiza, Ankieta, plus Ustawienia (na
+telefonie nie ma proxy z `package.json`, więc adres backendu trzeba podać
+jawnie — domyślnie `http://localhost/api`, nadpisywalne w aplikacji bez
+rebuildu).
+
+- **UI**: `MaterialApp` w ciemnym motywie, `BottomNavigationBar` + `IndexedStack`
+  (bez zewnętrznego routera/state managera — każdy ekran sam pobiera dane
+  przez `http` i trzyma stan przez `setState`).
+- **Wykresy**: [`fl_chart`](https://pub.dev/packages/fl_chart) (odpowiednik
+  Recharts z frontendu webowego).
+- **Trwały adres API**: `shared_preferences` (odpowiednik `AsyncStorage` z
+  wcześniejszej wersji React Native).
+- Foldery platformowe `android/`/`ios/` **nie są w repo** — generuje się je
+  lokalnie (`flutter create --platforms=android,ios .`), analogicznie do
+  wcześniejszego Expo managed workflow.
+
+Pełna instrukcja uruchomienia, budowania i publikacji w sklepach:
+[mobile/README.md](mobile/README.md). Techniczny opis warstwy API i różnic
+względem frontendu webowego: [docs/dokumentacja_techniczna.md](docs/dokumentacja_techniczna.md#7-aplikacja-mobilna-flutter).
+
 ## Struktura
 
 - `backend/` — FastAPI + SQL (`init.sql`), API na porcie 8000
@@ -76,3 +99,11 @@ importowany ponownie.
 - `mobile/` — klient mobilny (Flutter) na ten sam backend, zobacz [mobile/README.md](mobile/README.md)
 - `sync/` — pobieranie danych z Garmin/Mi Band do Postgresa
 - `nginx/` — reverse proxy, jedyny publiczny port (80): `/` → frontend, `/api/` → backend
+
+## Dokumentacja
+
+Pełny, techniczny opis całego systemu (architektura, model danych, referencja
+API, frontend, mobile, synchronizacja, infrastruktura) —
+[docs/dokumentacja_techniczna.md](docs/dokumentacja_techniczna.md).
+Materiał roboczy do pracy inżynierskiej (metodologia, wyniki korelacji,
+napotkane problemy) — [docs/raport_aplikacja_health_monitor.md](docs/raport_aplikacja_health_monitor.md).
