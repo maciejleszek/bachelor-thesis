@@ -67,6 +67,16 @@ class MetricsIn(BaseModel):
 async def health():
     return {"status": "ok"}
 
+# ── Sync status ──────────────────────────────────────────────────────────────
+
+@app.get("/sync-status")
+async def get_sync_status():
+    """Ostatni udany/próbowany sync per źródło — do wskaźnika "ostatni refresh" w UI."""
+    rows = await database.fetch_all(
+        "SELECT source, last_attempt_at, last_success_at, last_error FROM sync_log"
+    )
+    return {r["source"]: dict(r) for r in rows}
+
 # ── Surveys ──────────────────────────────────────────────────────────────────
 
 @app.get("/surveys")

@@ -5,6 +5,9 @@ import {
 } from "recharts";
 import MetricCard from "../components/MetricCard";
 import { api } from "../api";
+import { useInterval } from "../hooks/useInterval";
+
+const REFRESH_MS = 5 * 60 * 1000;
 
 const DAYS_OPTIONS = [
   { label: "30 dni", value: "30" },
@@ -50,13 +53,16 @@ export default function Sleep() {
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  function load() {
+    return api.getMetrics({ source, days }).then(setMetrics).catch(() => {});
+  }
+
   useEffect(() => {
     setLoading(true);
-    api.getMetrics({ source, days })
-      .then(setMetrics)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    load().finally(() => setLoading(false));
   }, [source, days]);
+
+  useInterval(load, REFRESH_MS);
 
   const nights = useMemo(() =>
     [...metrics]

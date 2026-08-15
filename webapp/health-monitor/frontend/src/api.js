@@ -26,4 +26,5 @@ export const api = {
   getActivityRecords: (p = {}) => request("/activities/records?" + new URLSearchParams(p)),
   getCorrelation: (p = {})     => request("/analysis/correlation?" + new URLSearchParams(p)),
   getTrainingRecovery: (p = {}) => request("/analysis/training-recovery?" + new URLSearchParams(p)),
+  getSyncStatus: ()         => request("/sync-status"),
 };

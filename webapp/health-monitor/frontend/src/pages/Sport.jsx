@@ -5,6 +5,9 @@ import {
 } from "recharts";
 import MetricCard from "../components/MetricCard";
 import { api } from "../api";
+import { useInterval } from "../hooks/useInterval";
+
+const REFRESH_MS = 5 * 60 * 1000;
 
 const VOLUME_COLORS = ["var(--accent)", "var(--accent2)", "var(--warn)", "var(--danger)", "#9c8fff", "var(--muted)"];
 
@@ -168,15 +171,20 @@ export default function Sport() {
       .catch(() => setRecords(null));
   }, [sportType]);
 
-  useEffect(() => {
-    setLoading(true);
+  function loadActivities() {
     const summaryParams = days ? { days } : {};
     const activityParams = { limit: 50, ...(days ? { days } : {}), ...(sportType ? { sport_type: sportType } : {}) };
-    Promise.all([
+    return Promise.all([
       api.getActivitySummary(summaryParams),
       api.getActivities(activityParams),
-    ])
-      .then(([s, a]) => { setSummary(s); setActivities(a); })
+    ]).then(([s, a]) => { setSummary(s); setActivities(a); });
+  }
+
+  useInterval(loadActivities, REFRESH_MS);
+
+  useEffect(() => {
+    setLoading(true);
+    loadActivities()
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [sportType, days]);

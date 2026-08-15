@@ -4,6 +4,9 @@ import {
   ResponsiveContainer, CartesianGrid
 } from "recharts";
 import { api } from "../api";
+import { useInterval } from "../hooks/useInterval";
+
+const REFRESH_MS = 5 * 60 * 1000;
 
 const METRICS = [
   { key: "hrv",             label: "HRV",                unit: "ms" },
@@ -126,16 +129,19 @@ export default function Analysis() {
   const [recoveryMetric, setRecoveryMetric] = useState("next_vas_stress");
   const [recovery, setRecovery] = useState(null);
 
-  useEffect(() => {
-    setLoading(true);
-    api.getCorrelation(days ? { days } : {})
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  function load() {
     api.getTrainingRecovery(days ? { days } : {})
       .then(setRecovery)
       .catch(() => {});
+    return api.getCorrelation(days ? { days } : {}).then(setData).catch(() => {});
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    load().finally(() => setLoading(false));
   }, [days]);
+
+  useInterval(load, REFRESH_MS);
 
   const scatterData = useMemo(() => {
     if (!data) return [];
@@ -219,14 +225,13 @@ export default function Analysis() {
         </select>
       </div>
 
-      {!hasEnoughData ? (
-        <div className="empty">
-          Za mało sparowanych dni (ankieta + dane Garmina tego samego dnia),
-          żeby policzyć korelację.<br />
-          Wypełniaj ankietę SAM+VAS regularnie i poczekaj na sync/backfill Garmina.
-        </div>
-      ) : (
-        <>
+      <>
+          {!hasEnoughData && (
+            <div className="form-hint" style={{ marginBottom: "var(--gap)" }}>
+              Za mało sparowanych dni (ankieta + dane Garmina tego samego dnia) na razie —
+              wartości poniżej uzupełnią się w miarę wypełniania ankiet SAM+VAS i syncu Garmina.
+            </div>
+          )}
           <div className="card" style={{ marginBottom: "var(--gap)" }}>
             <div className="card-title">Korelacja stresu (VAS) z metrykami</div>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
@@ -319,12 +324,13 @@ export default function Analysis() {
             z regeneracją następnego dnia?
           </div>
 
-          {!hasRecoveryData ? (
-            <div className="empty">
-              Za mało dni z treningiem i danymi z dnia następnego, żeby policzyć korelację.
+          {!hasRecoveryData && (
+            <div className="form-hint" style={{ marginBottom: "var(--gap)" }}>
+              Za mało dni z treningiem i danymi z dnia następnego na razie — wartości
+              poniżej uzupełnią się w miarę napływu kolejnych treningów i syncu Garmina.
             </div>
-          ) : (
-            <>
+          )}
+          <>
               <div className="card" style={{ marginBottom: "var(--gap)" }}>
                 <div className="card-title">Korelacja obciążenia treningowego z regeneracją</div>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>

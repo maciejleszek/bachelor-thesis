@@ -79,3 +79,12 @@ CREATE TABLE IF NOT EXISTS environment (
     humidity    NUMERIC(4,1),
     co2_ppm     INTEGER
 );
+
+-- Status ostatniego syncu per źródło (garmin_metrics, garmin_activities, miband) —
+-- do pokazania w UI "ostatni refresh"
+CREATE TABLE IF NOT EXISTS sync_log (
+    source           VARCHAR(32) PRIMARY KEY,
+    last_attempt_at  TIMESTAMPTZ,
+    last_success_at  TIMESTAMPTZ,
+    last_error       TEXT
+);

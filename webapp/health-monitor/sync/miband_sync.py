@@ -160,7 +160,8 @@ def _parse_mifitness_aggregated_csv(csv_path: Path) -> list[dict]:
             if key == "heart_rate":
                 day["avg_hr"] = value.get("avg_hr")
                 day["max_hr"] = value.get("max_hr")
-                day["resting_hr"] = value.get("avg_rhr")
+                # avg_rhr=0 to sentinel Mi Banda dla "nie wyliczono" — nie realna wartość
+                day["resting_hr"] = value.get("avg_rhr") or None
             elif key == "spo2":
                 day["spo2"] = value.get("avg_spo2") or None
             elif key == "steps":

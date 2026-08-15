@@ -4,6 +4,9 @@ import {
 } from "recharts";
 import MetricCard from "../components/MetricCard";
 import { api } from "../api";
+import { useInterval } from "../hooks/useInterval";
+
+const REFRESH_MS = 5 * 60 * 1000;
 
 function fmt(val, dec = 0) {
   if (val == null) return null;
@@ -36,12 +39,15 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  function load() {
+    return api.getSummary().then(setData).catch(() => {});
+  }
+
   useEffect(() => {
-    api.getSummary()
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    load().finally(() => setLoading(false));
   }, []);
+
+  useInterval(load, REFRESH_MS);
 
   if (loading) return <div className="empty">Ładowanie…</div>;
 
